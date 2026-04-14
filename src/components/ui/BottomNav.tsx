@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   {
     href: "/dashboard",
-    label: "Home",
+    label: "Главная",
     icon: (active: boolean) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <path
@@ -20,7 +20,7 @@ const NAV_ITEMS = [
   },
   {
     href: "/leaderboard",
-    label: "Rating",
+    label: "Рейтинг",
     icon: (active: boolean) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <path
@@ -34,7 +34,7 @@ const NAV_ITEMS = [
   },
   {
     href: "/profile",
-    label: "Profile",
+    label: "Профиль",
     icon: (active: boolean) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <circle

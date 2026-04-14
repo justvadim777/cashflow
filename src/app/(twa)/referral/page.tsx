@@ -104,7 +104,7 @@ export default function ReferralPage() {
             t.me/BOT?start=ref_{data.referralCode}
           </code>
           <Button size="sm" onClick={copyLink}>
-            Copy
+            Скопировать
           </Button>
         </div>
       </Card>

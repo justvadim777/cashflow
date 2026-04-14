@@ -109,12 +109,12 @@ export default function ProfilePage() {
               }`}
             >
               {t === "achievements"
-                ? "Badges"
+                ? "Значки"
                 : t === "rewards"
-                ? "Rewards"
+                ? "Награды"
                 : t === "goals"
-                ? "Goals"
-                : "Referral"}
+                ? "Цели"
+                : "Рефералы"}
             </button>
           )
         )}

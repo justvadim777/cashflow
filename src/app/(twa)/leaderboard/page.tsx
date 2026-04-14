@@ -18,9 +18,9 @@ interface LeaderboardPlayer {
 type Period = "all" | "week" | "month";
 
 const PERIOD_LABELS: Record<Period, string> = {
-  all: "All time",
-  week: "Last week",
-  month: "Last month",
+  all: "За всё время",
+  week: "За неделю",
+  month: "За месяц",
 };
 
 function Avatar({

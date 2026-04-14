@@ -25,6 +25,11 @@ npx prisma migrate deploy
 echo ">>> Next.js build..."
 npm run build
 
+# 4.1 Копирование static файлов в standalone
+echo ">>> Копирование static..."
+cp -r .next/static .next/standalone/.next/static
+cp -r public .next/standalone/public
+
 # 5. Перезапуск сервисов
 echo ">>> Перезапуск сервисов..."
 systemctl restart cashflow

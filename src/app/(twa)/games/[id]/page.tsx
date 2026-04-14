@@ -190,7 +190,7 @@ export default function GameDetailPage() {
                 )}
               </div>
               <p className="text-gold text-sm font-bold">
-                {p.user.totalPoints} pts
+                {p.user.totalPoints} б.
               </p>
             </Card>
           ))}

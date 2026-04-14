@@ -100,7 +100,7 @@ export default function DashboardPage() {
                 );
               }}
             >
-              Copy
+              Скопировать
             </Button>
           </div>
         </Card>
