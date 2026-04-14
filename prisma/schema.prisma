@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ Enums ============
+
+enum UserRole {
+  PLAYER
+  HOST
+  ADMIN
+  OWNER
+}
+
+enum UserLevel {
+  NEWBIE
+  PLAYER
+  INVESTOR
+  CAPITALIST
+}
+
+enum GameType {
+  BASE
+  MAIN
+}
+
+enum GameStatus {
+  OPEN
+  FULL
+  FINISHED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum WithdrawalStatus {
+  CREATED
+  PROCESSING
+  DONE
+}
+
+enum AchievementType {
+  FIRST_GAME
+  FIRST_EXIT
+  FIRST_DREAM
+  THREE_IN_ROW
+  FIVE_TOTAL
+  FIRST_REFERRAL
+}
+
+// ============ Models ============
+
+model User {
+  id             String   @id @default(cuid())
+  telegramId     BigInt   @unique @map("telegram_id")
+  username       String?
+  displayName    String   @map("display_name")
+  avatarUrl      String?  @map("avatar_url")
+  role           UserRole @default(PLAYER)
+
+  totalPoints    Int       @default(0) @map("total_points")
+  monthlyPoints  Int       @default(0) @map("monthly_points")
+  level          UserLevel @default(NEWBIE)
+
+  referralCode   String   @unique @map("referral_code")
+  referredById   String?  @map("referred_by_id")
+  referredBy     User?    @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals      User[]   @relation("UserReferrals")
+  referralBalance Int     @default(0) @map("referral_balance")
+
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  participations GameParticipant[]
+  payments       Payment[]
+  gameResults    GameResult[]
+  referralsMade  Referral[]          @relation("ReferralsMade")
+  referralsReceived Referral[]       @relation("ReferralsReceived")
+  withdrawals    WithdrawalRequest[]
+  achievements   Achievement[]
+  createdGames   Game[]
+
+  @@map("users")
+}
+
+model Game {
+  id           String     @id @default(cuid())
+  date         DateTime
+  time         String
+  type         GameType   @default(BASE)
+  price        Int        // в копейках: 70000 = 700₽
+  playersLimit Int        @map("players_limit")
+  playersCount Int        @default(0) @map("players_count")
+  status       GameStatus @default(OPEN)
+  description  String?
+
+  createdById  String     @map("created_by_id")
+  createdBy    User       @relation(fields: [createdById], references: [id])
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  participants GameParticipant[]
+  payments     Payment[]
+  results      GameResult[]
+  referrals    Referral[]
+
+  @@map("games")
+}
+
+model GameParticipant {
+  id        String   @id @default(cuid())
+  gameId    String   @map("game_id")
+  game      Game     @relation(fields: [gameId], references: [id])
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  paymentId String?  @unique @map("payment_id")
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  @@unique([gameId, userId])
+  @@map("game_participants")
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  userId            String        @map("user_id")
+  user              User          @relation(fields: [userId], references: [id])
+  gameId            String        @map("game_id")
+  game              Game          @relation(fields: [gameId], references: [id])
+  amount            Int           // в копейках
+  status            PaymentStatus @default(PENDING)
+  providerPaymentId String?       @map("provider_payment_id")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  participant       GameParticipant?
+
+  @@map("payments")
+}
+
+model GameResult {
+  id     String @id @default(cuid())
+  gameId String @map("game_id")
+  game   Game   @relation(fields: [gameId], references: [id])
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  // Навыки (1-10)
+  skillFinance       Int @default(0) @map("skill_finance")
+  skillStrategy      Int @default(0) @map("skill_strategy")
+  skillOpportunity   Int @default(0) @map("skill_opportunity")
+  skillDecision      Int @default(0) @map("skill_decision")
+  skillFocus         Int @default(0) @map("skill_focus")
+  skillCommunication Int @default(0) @map("skill_communication")
+  skillLeadership    Int @default(0) @map("skill_leadership")
+  skillAdaptation    Int @default(0) @map("skill_adaptation")
+  skillLearning      Int @default(0) @map("skill_learning")
+  skillEngagement    Int @default(0) @map("skill_engagement")
+
+  // Игровые баллы
+  pointsExitRatRace  Int @default(0) @map("points_exit_rat_race")
+  pointsLiabilities  Int @default(0) @map("points_liabilities")
+  pointsDream        Int @default(0) @map("points_dream")
+  pointsBestIncome   Int @default(0) @map("points_best_income")
+  pointsIncomeGrowth Int @default(0) @map("points_income_growth")
+
+  // Дополнительные баллы
+  pointsSecret       Int @default(0) @map("points_secret")
+  pointsOrder        Int @default(0) @map("points_order")
+  pointsSubscription Int @default(0) @map("points_subscription")
+  pointsVideoReview  Int @default(0) @map("points_video_review")
+  pointsStories      Int @default(0) @map("points_stories")
+
+  totalPoints        Int @default(0) @map("total_points")
+
+  @@unique([gameId, userId])
+  @@map("game_results")
+}
+
+model Referral {
+  id         String            @id @default(cuid())
+  referrerId String            @map("referrer_id")
+  referrer   User              @relation("ReferralsMade", fields: [referrerId], references: [id])
+  referredId String            @map("referred_id")
+  referred   User              @relation("ReferralsReceived", fields: [referredId], references: [id])
+  gameId     String            @map("game_id")
+  game       Game              @relation(fields: [gameId], references: [id])
+  amount     Int               // в копейках, 15%
+  status     PaymentStatus     @default(PENDING)
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  @@map("referrals")
+}
+
+model WithdrawalRequest {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id])
+  amount    Int              // в копейках
+  status    WithdrawalStatus @default(CREATED)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@map("withdrawal_requests")
+}
+
+model Achievement {
+  id       String          @id @default(cuid())
+  userId   String          @map("user_id")
+  user     User            @relation(fields: [userId], references: [id])
+  type     AchievementType
+  earnedAt DateTime        @default(now()) @map("earned_at")
+
+  @@unique([userId, type])
+  @@map("achievements")
+}
