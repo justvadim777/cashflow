@@ -175,13 +175,13 @@ export default function ProfilePage() {
               <p className="text-text-secondary text-xs mb-1">Твоя ссылка</p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 bg-bg rounded-lg px-3 py-2 text-xs text-accent break-all">
-                  t.me/BOT?start=ref_{user.referralCode}
+                  t.me/denezhnyjpotok_bot?start=ref_{user.referralCode}
                 </code>
                 <Button
                   size="sm"
                   onClick={() => {
                     navigator.clipboard.writeText(
-                      `https://t.me/BOT?start=ref_${user.referralCode}`
+                      `https://t.me/denezhnyjpotok_bot?start=ref_${user.referralCode}`
                     );
                   }}
                 >

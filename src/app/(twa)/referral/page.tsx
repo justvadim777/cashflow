@@ -53,7 +53,7 @@ export default function ReferralPage() {
   function copyLink() {
     if (!data) return;
     navigator.clipboard.writeText(
-      `https://t.me/BOT?start=ref_${data.referralCode}`
+      `https://t.me/denezhnyjpotok_bot?start=ref_${data.referralCode}`
     );
   }
 
@@ -102,7 +102,7 @@ export default function ReferralPage() {
         <p className="text-text-secondary text-sm mb-2">Твоя реферальная ссылка</p>
         <div className="flex items-center gap-2">
           <code className="flex-1 bg-bg rounded-lg px-3 py-2 text-sm text-accent truncate">
-            t.me/BOT?start=ref_{data.referralCode}
+            t.me/denezhnyjpotok_bot?start=ref_{data.referralCode}
           </code>
           <Button size="sm" onClick={copyLink}>
             Скопировать
