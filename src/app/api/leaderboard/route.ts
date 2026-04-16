@@ -14,17 +14,19 @@ export async function GET(req: NextRequest) {
       weekStart.setDate(weekStart.getDate() - 7);
       weekStart.setHours(0, 0, 0, 0);
 
+      // Баллы за неделю по юзерам
       const weeklyResults = await prisma.gameResult.groupBy({
         by: ["userId"],
         where: { game: { date: { gte: weekStart } } },
         _sum: { totalPoints: true },
-        orderBy: { _sum: { totalPoints: "desc" } },
-        take: 50,
       });
 
-      const userIds = weeklyResults.map((r) => r.userId);
-      const users = await prisma.user.findMany({
-        where: { id: { in: userIds } },
+      const weeklyMap = new Map(
+        weeklyResults.map((r) => [r.userId, r._sum.totalPoints || 0])
+      );
+
+      // Все пользователи
+      const allUsers = await prisma.user.findMany({
         select: {
           id: true,
           displayName: true,
@@ -36,17 +38,12 @@ export async function GET(req: NextRequest) {
         },
       });
 
-      const userMap = new Map(users.map((u) => [u.id, u]));
-      const players = weeklyResults
-        .map((r) => {
-          const u = userMap.get(r.userId);
-          if (!u) return null;
-          return { ...u, weeklyPoints: r._sum.totalPoints || 0 };
-        })
-        .filter(Boolean);
+      const players = allUsers
+        .map((u) => ({ ...u, weeklyPoints: weeklyMap.get(u.id) || 0 }))
+        .sort((a, b) => b.weeklyPoints - a.weeklyPoints)
+        .slice(0, 50);
 
-      // Позиция текущего юзера
-      const userIndex = players.findIndex((p) => p!.id === user.id);
+      const userIndex = players.findIndex((p) => p.id === user.id);
       const userPosition = userIndex >= 0 ? userIndex + 1 : 0;
 
       return NextResponse.json({ players, userPosition, userId: user.id });

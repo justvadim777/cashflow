@@ -43,7 +43,7 @@ export default function InfoPage() {
   const [current, setCurrent] = useState(0);
 
   return (
-    <div className="flex flex-col items-center min-h-[70vh] justify-center">
+    <div className="flex flex-col pb-4">
       <AnimatePresence mode="wait">
         <motion.div
           key={current}
@@ -53,10 +53,10 @@ export default function InfoPage() {
           transition={{ duration: 0.2 }}
           className="w-full"
         >
-          <Card className="text-center py-8 px-6">
-            <div className="text-5xl mb-4">{SLIDES[current].emoji}</div>
-            <h2 className="text-xl font-bold mb-3">{SLIDES[current].title}</h2>
-            <p className="text-text-secondary leading-relaxed whitespace-pre-line text-left">
+          <Card className="text-center py-6 px-5">
+            <div className="text-4xl mb-3">{SLIDES[current].emoji}</div>
+            <h2 className="text-lg font-bold mb-3">{SLIDES[current].title}</h2>
+            <p className="text-text-secondary text-sm leading-relaxed whitespace-pre-line text-left">
               {SLIDES[current].text}
             </p>
           </Card>
@@ -64,7 +64,7 @@ export default function InfoPage() {
       </AnimatePresence>
 
       {/* Dots */}
-      <div className="flex gap-2 mt-6">
+      <div className="flex justify-center gap-2 mt-4">
         {SLIDES.map((_, i) => (
           <button
             key={i}
@@ -77,8 +77,8 @@ export default function InfoPage() {
       </div>
 
       {/* Navigation */}
-      <div className="flex gap-3 mt-6 w-full">
-        {current > 0 && (
+      <div className="flex gap-3 mt-4 w-full">
+        {current > 0 ? (
           <Button
             variant="secondary"
             className="flex-1"
@@ -86,6 +86,8 @@ export default function InfoPage() {
           >
             Назад
           </Button>
+        ) : (
+          <div className="flex-1" />
         )}
         {current < SLIDES.length - 1 ? (
           <Button
@@ -95,8 +97,8 @@ export default function InfoPage() {
             Далее
           </Button>
         ) : (
-          <Link href="/games" className="flex-1">
-            <Button className="w-full">Записаться на игру</Button>
+          <Link href="/games" className="flex-1 block">
+            <Button className="w-full">К играм</Button>
           </Link>
         )}
       </div>

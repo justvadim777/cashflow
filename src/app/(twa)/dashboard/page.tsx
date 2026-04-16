@@ -72,31 +72,33 @@ export default function DashboardPage() {
 
       {/* Ближайшая игра */}
       {nextGame && (
-        <Link href={`/games/${nextGame.id}`}>
-          <Card className="border-accent/30 hover:border-accent/50 transition-colors">
-            <p className="text-text-secondary text-xs mb-1">Ближайшая игра</p>
-            <div className="flex items-center justify-between">
-              <p className="font-semibold">
-                {new Date(nextGame.date).toLocaleDateString("ru-RU", {
-                  day: "numeric",
-                  month: "long",
-                })}{" "}
-                в {nextGame.time}
-              </p>
-              <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
-                nextGame.type === "MAIN" ? "bg-gold/20 text-gold" : "bg-accent/20 text-accent"
-              }`}>
-                {TYPE_LABELS[nextGame.type] || nextGame.type}
-              </span>
-            </div>
-          </Card>
-        </Link>
+        <div>
+          <Link href={`/games/${nextGame.id}`} className="block">
+            <Card className="border-accent/30 hover:border-accent/50 transition-colors">
+              <p className="text-text-secondary text-xs mb-1">Ближайшая игра</p>
+              <div className="flex items-center justify-between">
+                <p className="font-semibold">
+                  {new Date(nextGame.date).toLocaleDateString("ru-RU", {
+                    day: "numeric",
+                    month: "long",
+                  })}{" "}
+                  в {nextGame.time}
+                </p>
+                <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
+                  nextGame.type === "MAIN" ? "bg-gold/20 text-gold" : "bg-accent/20 text-accent"
+                }`}>
+                  {TYPE_LABELS[nextGame.type] || nextGame.type}
+                </span>
+              </div>
+            </Card>
+          </Link>
+        </div>
       )}
 
       {/* Быстрые действия */}
       <div className="grid grid-cols-2 gap-3">
-        <Link href="/games">
-          <Card className="text-center hover:border-accent/30 transition-colors">
+        <Link href="/games" className="block">
+          <Card className="text-center hover:border-accent/30 transition-colors h-full">
             <div className="text-3xl mb-2">🎲</div>
             <p className="font-semibold text-sm">Игры</p>
             <p className="text-text-secondary text-xs mt-1">
@@ -105,8 +107,8 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/leaderboard">
-          <Card className="text-center hover:border-accent/30 transition-colors">
+        <Link href="/leaderboard" className="block">
+          <Card className="text-center hover:border-accent/30 transition-colors h-full">
             <div className="text-3xl mb-2">🏆</div>
             <p className="font-semibold text-sm">Рейтинг</p>
             <p className="text-text-secondary text-xs mt-1">
@@ -115,8 +117,8 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/referral">
-          <Card className="text-center hover:border-accent/30 transition-colors">
+        <Link href="/referral" className="block">
+          <Card className="text-center hover:border-accent/30 transition-colors h-full">
             <div className="text-3xl mb-2">🤝</div>
             <p className="font-semibold text-sm">Реферал</p>
             <p className="text-text-secondary text-xs mt-1">
@@ -125,8 +127,8 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/profile">
-          <Card className="text-center hover:border-accent/30 transition-colors">
+        <Link href="/profile" className="block">
+          <Card className="text-center hover:border-accent/30 transition-colors h-full">
             <div className="text-3xl mb-2">👤</div>
             <p className="font-semibold text-sm">Профиль</p>
             <p className="text-text-secondary text-xs mt-1">
@@ -135,7 +137,7 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/info" className="col-span-2">
+        <Link href="/info" className="block col-span-2">
           <Card className="text-center hover:border-accent/30 transition-colors">
             <div className="text-3xl mb-2">ℹ️</div>
             <p className="font-semibold text-sm">О Cashflow</p>

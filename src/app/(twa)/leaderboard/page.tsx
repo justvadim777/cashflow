@@ -13,7 +13,14 @@ interface LeaderboardPlayer {
   avatarUrl: string | null;
   totalPoints: number;
   monthlyPoints: number;
+  weeklyPoints?: number;
   level: string;
+}
+
+function getDisplayPoints(player: LeaderboardPlayer, period: Period): number {
+  if (period === "week") return player.weeklyPoints ?? 0;
+  if (period === "month") return player.monthlyPoints;
+  return player.totalPoints;
 }
 
 type Period = "all" | "week" | "month";
@@ -157,7 +164,7 @@ export default function LeaderboardPage() {
                       {player.displayName}
                     </p>
                     <p className="text-gold text-xs font-bold">
-                      {player.totalPoints}
+                      {getDisplayPoints(player, period)}
                     </p>
                   </motion.div>
                 );
@@ -193,7 +200,7 @@ export default function LeaderboardPage() {
                       </p>
                     </div>
                     <p className="text-gold text-sm font-bold">
-                      {player.totalPoints}
+                      {getDisplayPoints(player, period)}
                     </p>
                   </Card>
                 </motion.div>
