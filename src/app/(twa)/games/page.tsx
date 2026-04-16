@@ -27,6 +27,11 @@ interface Game {
   participants: GameParticipant[];
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  BASE: "Базовая",
+  MAIN: "Продвинутая",
+};
+
 type TabFilter = "active" | "finished";
 
 export default function GamesPage() {
@@ -86,7 +91,7 @@ export default function GamesPage() {
                 : "text-text-secondary hover:text-white"
             }`}
           >
-            {t === "" ? "Все" : t}
+            {t === "" ? "Все" : TYPE_LABELS[t]}
           </button>
         ))}
       </div>
@@ -122,7 +127,7 @@ export default function GamesPage() {
                               : "bg-accent/20 text-accent"
                           }`}
                         >
-                          {game.type}
+                          {TYPE_LABELS[game.type]}
                         </span>
                         {game.status === "FULL" && (
                           <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-danger/20 text-danger">

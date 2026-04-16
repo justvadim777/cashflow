@@ -54,6 +54,11 @@ const EXTRA_POINT_FIELDS = [
   { key: "pointsStories", label: "Сторис", points: 5 },
 ] as const;
 
+const TYPE_LABELS: Record<string, string> = {
+  BASE: "Базовая",
+  MAIN: "Продвинутая",
+};
+
 type Tab = "participants" | "results" | "games" | "analytics";
 
 export default function AdminPage() {
@@ -234,7 +239,7 @@ export default function AdminPage() {
                         })}{" "}
                         в {game.time}
                       </p>
-                      <p className="text-text-secondary text-xs">{game.type}</p>
+                      <p className="text-text-secondary text-xs">{TYPE_LABELS[game.type] || game.type}</p>
                     </div>
                     <div className="text-right">
                       <span className="text-xs text-text-secondary">
@@ -342,7 +347,7 @@ export default function AdminPage() {
               <option value="">Выберите игру</option>
               {games.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {new Date(g.date).toLocaleDateString("ru-RU")} {g.time} — {g.type}
+                  {new Date(g.date).toLocaleDateString("ru-RU")} {g.time} — {TYPE_LABELS[g.type] || g.type}
                 </option>
               ))}
             </select>
@@ -563,8 +568,8 @@ export default function AdminPage() {
               onChange={(e) => setNewGame({ ...newGame, type: e.target.value })}
               className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-white"
             >
-              <option value="BASE">BASE</option>
-              <option value="MAIN">MAIN</option>
+              <option value="BASE">Базовая (700 ₽)</option>
+              <option value="MAIN">Продвинутая (2 000 ₽)</option>
             </select>
           </div>
           <div>
@@ -804,7 +809,7 @@ export default function AdminPage() {
                           })}{" "}
                           в {g.time}
                         </p>
-                        <p className="text-text-secondary text-xs">{g.type}</p>
+                        <p className="text-text-secondary text-xs">{TYPE_LABELS[g.type] || g.type}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-bold">

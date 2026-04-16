@@ -18,6 +18,11 @@ const SLIDES = [
     emoji: "🎯",
   },
   {
+    title: "Два формата игр",
+    text: "🟢 Базовая (700 ₽) — начальный уровень. Подходит новичкам: обучение правилам, первые навыки инвестирования, спокойный темп.\n\n🔵 Продвинутая (2 000 ₽) — для опытных игроков. Более сильные соперники, акцент на стратегии, глубокие решения.",
+    emoji: "🎮",
+  },
+  {
     title: "Баллы и рейтинг",
     text: "За каждую игру ты получаешь баллы от ведущего по 10 навыкам + бонусные баллы. Баллы формируют твой рейтинг и уровень: Новичок → Игрок → Инвестор → Капиталист.",
     emoji: "⭐",
@@ -51,7 +56,7 @@ export default function InfoPage() {
           <Card className="text-center py-8 px-6">
             <div className="text-5xl mb-4">{SLIDES[current].emoji}</div>
             <h2 className="text-xl font-bold mb-3">{SLIDES[current].title}</h2>
-            <p className="text-text-secondary leading-relaxed">
+            <p className="text-text-secondary leading-relaxed whitespace-pre-line text-left">
               {SLIDES[current].text}
             </p>
           </Card>

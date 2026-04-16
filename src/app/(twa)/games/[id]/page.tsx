@@ -31,6 +31,11 @@ interface GameDetail {
   results: { totalPoints: number }[];
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  BASE: "Базовая",
+  MAIN: "Продвинутая",
+};
+
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -94,7 +99,7 @@ export default function GameDetailPage() {
               : "bg-accent/20 text-accent"
           }`}
         >
-          {game.type}
+          {TYPE_LABELS[game.type]}
         </span>
         <span
           className={`px-3 py-1 rounded-lg text-sm font-bold ${
