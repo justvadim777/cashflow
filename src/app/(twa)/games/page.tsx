@@ -31,6 +31,7 @@ type TabFilter = "active" | "finished";
 
 export default function GamesPage() {
   const [games, setGames] = useState<Game[]>([]);
+  const [topPlayerIds, setTopPlayerIds] = useState<string[]>([]);
   const [tab, setTab] = useState<TabFilter>("active");
   const [typeFilter, setTypeFilter] = useState<"" | "BASE" | "MAIN">("");
   const [loading, setLoading] = useState(true);
@@ -41,8 +42,9 @@ export default function GamesPage() {
       try {
         const params = new URLSearchParams({ status: tab });
         if (typeFilter) params.set("type", typeFilter);
-        const data = await api<{ games: Game[] }>(`/games?${params}`);
+        const data = await api<{ games: Game[]; topPlayerIds: string[] }>(`/games?${params}`);
         setGames(data.games);
+        setTopPlayerIds(data.topPlayerIds || []);
       } catch {
         setGames([]);
       }
@@ -102,14 +104,17 @@ export default function GamesPage() {
         <div className="space-y-3">
           {games.map((game) => {
             const spotsLeft = game.playersLimit - game.playersCount;
-            const lowSpots = spotsLeft > 0 && spotsLeft <= game.playersLimit * 0.5;
+            const lowSpots = spotsLeft > 0 && spotsLeft <= 2 && game.status === "OPEN";
+            const hasTopPlayer = game.participants.some((p) =>
+              topPlayerIds.includes(p.user.id)
+            );
 
             return (
               <Link key={game.id} href={`/games/${game.id}`}>
                 <Card className="hover:border-accent/30 transition-colors">
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className={`px-2 py-0.5 rounded-md text-xs font-bold ${
                             game.type === "MAIN"
@@ -124,9 +129,14 @@ export default function GamesPage() {
                             Мест нет
                           </span>
                         )}
-                        {lowSpots && game.status === "OPEN" && (
+                        {lowSpots && (
                           <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-gold/20 text-gold">
                             Мало мест
+                          </span>
+                        )}
+                        {hasTopPlayer && game.status !== "FINISHED" && (
+                          <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-accent/20 text-accent">
+                            Топ игрок
                           </span>
                         )}
                       </div>

@@ -35,12 +35,16 @@ export async function GET(req: NextRequest) {
       orderBy: { date: "asc" },
     });
 
-    const serialized = games.map((game: { price: number } & Record<string, unknown>) => ({
-      ...game,
-      price: game.price,
-    }));
+    // Топ-3 игрока по очкам
+    const top3 = await prisma.user.findMany({
+      orderBy: { totalPoints: "desc" },
+      where: { totalPoints: { gt: 0 } },
+      take: 3,
+      select: { id: true },
+    });
+    const topPlayerIds = top3.map((p) => p.id);
 
-    return NextResponse.json({ games: serialized, userId: user.id });
+    return NextResponse.json({ games, userId: user.id, topPlayerIds });
   });
 }
 
