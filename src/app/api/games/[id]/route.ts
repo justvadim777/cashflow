@@ -14,7 +14,10 @@ export async function GET(
       where: { id },
       include: {
         participants: {
-          include: {
+          select: {
+            id: true,
+            confirmed: true,
+            userId: true,
             user: {
               select: {
                 id: true,
@@ -22,6 +25,7 @@ export async function GET(
                 avatarUrl: true,
                 username: true,
                 totalPoints: true,
+                telegramId: true,
               },
             },
           },

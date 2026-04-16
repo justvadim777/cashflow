@@ -6,15 +6,24 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 
+interface Participant {
+  id: string;
+  confirmed: boolean;
+  user: {
+    id: string;
+    displayName: string;
+    username: string | null;
+    telegramId: string;
+  };
+}
+
 interface GameForResults {
   id: string;
   date: string;
   time: string;
   type: string;
   status: string;
-  participants: {
-    user: { id: string; displayName: string };
-  }[];
+  participants: Participant[];
 }
 
 const SKILL_FIELDS = [
@@ -46,11 +55,12 @@ const EXTRA_POINT_FIELDS = [
   { key: "pointsStories", label: "Сторис (+5)" },
 ] as const;
 
-type Tab = "results" | "analytics" | "games";
+type Tab = "participants" | "results" | "games" | "analytics";
 
 export default function AdminPage() {
   const { role } = useUserStore();
-  const [tab, setTab] = useState<Tab>("results");
+  const [tab, setTab] = useState<Tab>("participants");
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [games, setGames] = useState<GameForResults[]>([]);
   const [selectedGame, setSelectedGame] = useState<string>("");
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
@@ -125,6 +135,22 @@ export default function AdminPage() {
     setSaving(false);
   }
 
+  async function handleParticipant(gameId: string, participantId: string, action: "confirm" | "reject") {
+    setConfirming(participantId);
+    try {
+      await api(`/games/${gameId}/confirm`, {
+        method: "PATCH",
+        body: JSON.stringify({ participantId, action }),
+      });
+      // Перезагрузить список игр
+      const data = await api<{ games: GameForResults[] }>("/games?status=active");
+      setGames(data.games);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка");
+    }
+    setConfirming(null);
+  }
+
   async function createGame() {
     try {
       await api("/games", {
@@ -146,6 +172,16 @@ export default function AdminPage() {
       <div className="flex gap-1 bg-card rounded-xl p-1">
         {(isAdmin || isHost) && (
           <button
+            onClick={() => setTab("participants")}
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
+              tab === "participants" ? "bg-accent text-white" : "text-text-secondary"
+            }`}
+          >
+            Заявки
+          </button>
+        )}
+        {(isAdmin || isHost) && (
+          <button
             onClick={() => setTab("results")}
             className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
               tab === "results" ? "bg-accent text-white" : "text-text-secondary"
@@ -161,7 +197,7 @@ export default function AdminPage() {
               tab === "games" ? "bg-accent text-white" : "text-text-secondary"
             }`}
           >
-            Создать игру
+            Создать
           </button>
         )}
         {(isAdmin || isOwner) && (
@@ -175,6 +211,111 @@ export default function AdminPage() {
           </button>
         )}
       </div>
+
+      {/* Participants tab */}
+      {tab === "participants" && (
+        <div className="space-y-4">
+          {games.length === 0 ? (
+            <Card className="text-center py-8">
+              <p className="text-text-secondary">Нет активных игр</p>
+            </Card>
+          ) : (
+            games.map((game) => {
+              const pending = game.participants.filter((p) => !p.confirmed);
+              const confirmed = game.participants.filter((p) => p.confirmed);
+
+              return (
+                <Card key={game.id} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold">
+                        {new Date(game.date).toLocaleDateString("ru-RU", {
+                          day: "numeric",
+                          month: "long",
+                        })}{" "}
+                        в {game.time}
+                      </p>
+                      <p className="text-text-secondary text-xs">{game.type}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-text-secondary">
+                        {confirmed.length} подтв. / {game.participants.length} всего
+                      </span>
+                    </div>
+                  </div>
+
+                  {pending.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-gold text-xs font-semibold">Ожидают оплаты:</p>
+                      {pending.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-3 bg-bg rounded-xl px-3 py-2"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm truncate">
+                              {p.user.displayName}
+                            </p>
+                            {p.user.username && (
+                              <p className="text-text-secondary text-xs">
+                                @{p.user.username}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleParticipant(game.id, p.id, "confirm")}
+                              disabled={confirming === p.id}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-success/20 text-success hover:bg-success/30 transition-colors disabled:opacity-50"
+                            >
+                              {confirming === p.id ? "..." : "Оплатил"}
+                            </button>
+                            <button
+                              onClick={() => handleParticipant(game.id, p.id, "reject")}
+                              disabled={confirming === p.id}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-danger/20 text-danger hover:bg-danger/30 transition-colors disabled:opacity-50"
+                            >
+                              Отмена
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {confirmed.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-success text-xs font-semibold">Подтверждены:</p>
+                      {confirmed.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-3 bg-bg rounded-xl px-3 py-2"
+                        >
+                          <p className="text-sm truncate flex-1">
+                            {p.user.displayName}
+                            {p.user.username && (
+                              <span className="text-text-secondary text-xs ml-1">
+                                @{p.user.username}
+                              </span>
+                            )}
+                          </p>
+                          <span className="text-success text-xs">✓</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {game.participants.length === 0 && (
+                    <p className="text-text-secondary text-sm text-center py-2">
+                      Пока никто не записался
+                    </p>
+                  )}
+                </Card>
+              );
+            })
+          )}
+        </div>
+      )}
 
       {/* Results tab */}
       {tab === "results" && (

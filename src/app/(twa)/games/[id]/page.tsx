@@ -19,6 +19,7 @@ interface GameDetail {
   description: string | null;
   createdBy: { id: string; displayName: string };
   participants: {
+    confirmed: boolean;
     user: {
       id: string;
       displayName: string;
@@ -36,7 +37,7 @@ export default function GameDetailPage() {
   const [game, setGame] = useState<GameDetail | null>(null);
   const [isParticipant, setIsParticipant] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [paying, setPaying] = useState(false);
+  const [registering, setRegistering] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -55,21 +56,17 @@ export default function GameDetailPage() {
     load();
   }, [id, router]);
 
-  async function handlePay() {
+  async function handleRegister() {
     if (!game) return;
-    setPaying(true);
+    setRegistering(true);
     try {
-      const data = await api<{ paymentUrl: string }>("/payments", {
-        method: "POST",
-        body: JSON.stringify({ gameId: game.id }),
-      });
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      }
+      await api(`/games/${game.id}/register`, { method: "POST" });
+      setIsParticipant(true);
+      setGame({ ...game, playersCount: game.playersCount + 1 });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка оплаты");
+      alert(e instanceof Error ? e.message : "Ошибка записи");
     }
-    setPaying(false);
+    setRegistering(false);
   }
 
   if (loading || !game) {
@@ -146,20 +143,21 @@ export default function GameDetailPage() {
         </div>
       </Card>
 
-      {/* Кнопка оплаты */}
+      {/* Кнопка записи */}
       {game.status === "OPEN" && !isParticipant && (
         <Button
           className="w-full"
           size="lg"
-          onClick={handlePay}
-          disabled={paying}
+          onClick={handleRegister}
+          disabled={registering}
         >
-          {paying ? "Оформление..." : "Записаться и оплатить"}
+          {registering ? "Записываем..." : "Записаться на игру"}
         </Button>
       )}
       {isParticipant && (
         <Card className="text-center bg-success/10 border-success/30">
           <p className="text-success font-semibold">Вы записаны на эту игру</p>
+          <p className="text-text-secondary text-xs mt-1">Организатор свяжется с вами для оплаты</p>
         </Card>
       )}
 
@@ -191,9 +189,13 @@ export default function GameDetailPage() {
                   </p>
                 )}
               </div>
-              <p className="text-gold text-sm font-bold">
-                {p.user.totalPoints} б.
-              </p>
+              <div className="flex items-center gap-2">
+                {p.confirmed ? (
+                  <span className="text-success text-xs font-semibold">Оплачен</span>
+                ) : (
+                  <span className="text-gold text-xs font-semibold">Ожидает</span>
+                )}
+              </div>
             </Card>
           ))}
         </div>

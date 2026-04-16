@@ -18,9 +18,12 @@ export async function GET(req: NextRequest) {
       },
       include: {
         participants: {
-          include: {
+          select: {
+            id: true,
+            confirmed: true,
+            userId: true,
             user: {
-              select: { id: true, displayName: true, avatarUrl: true, username: true },
+              select: { id: true, displayName: true, avatarUrl: true, username: true, telegramId: true },
             },
           },
         },
