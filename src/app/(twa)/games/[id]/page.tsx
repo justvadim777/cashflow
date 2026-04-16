@@ -74,6 +74,20 @@ export default function GameDetailPage() {
     setRegistering(false);
   }
 
+  async function handleCancel() {
+    if (!game) return;
+    if (!confirm("Точно отменить запись на игру?")) return;
+    setRegistering(true);
+    try {
+      await api(`/games/${game.id}/register`, { method: "DELETE" });
+      setIsParticipant(false);
+      setGame({ ...game, playersCount: Math.max(0, game.playersCount - 1) });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка отмены");
+    }
+    setRegistering(false);
+  }
+
   if (loading || !game) {
     return (
       <div className="flex justify-center py-12">
@@ -159,11 +173,21 @@ export default function GameDetailPage() {
           {registering ? "Записываем..." : "Записаться на игру"}
         </Button>
       )}
-      {isParticipant && (
-        <Card className="text-center bg-success/10 border-success/30">
-          <p className="text-success font-semibold">Вы записаны на эту игру</p>
-          <p className="text-text-secondary text-xs mt-1">Организатор свяжется с вами для оплаты</p>
-        </Card>
+      {isParticipant && game.status !== "FINISHED" && (
+        <>
+          <Card className="text-center bg-success/10 border-success/30">
+            <p className="text-success font-semibold">Вы записаны на эту игру</p>
+            <p className="text-text-secondary text-xs mt-1">Организатор свяжется с вами для оплаты</p>
+          </Card>
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={handleCancel}
+            disabled={registering}
+          >
+            {registering ? "..." : "Отменить запись"}
+          </Button>
+        </>
       )}
 
       {/* Участники */}

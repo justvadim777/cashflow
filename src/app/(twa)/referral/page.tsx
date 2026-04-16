@@ -104,15 +104,27 @@ export default function ReferralPage() {
             </p>
           </div>
         </div>
-        {data.referralBalance > 0 && (
-          <div className="flex gap-3 mt-4">
-            <Button className="flex-1" onClick={handleWithdraw}>
-              Вывести
-            </Button>
-            <Button className="flex-1" variant="secondary" onClick={handleCoupon}>
-              Купон
-            </Button>
-          </div>
+        <div className="flex gap-3 mt-4">
+          <Button
+            className="flex-1"
+            onClick={handleWithdraw}
+            disabled={data.referralBalance <= 0}
+          >
+            Вывести
+          </Button>
+          <Button
+            className="flex-1"
+            variant="secondary"
+            onClick={handleCoupon}
+            disabled={data.referralBalance <= 0}
+          >
+            Купон
+          </Button>
+        </div>
+        {data.referralBalance <= 0 && (
+          <p className="text-text-secondary text-xs text-center mt-2">
+            Пригласи друга, чтобы получить баланс
+          </p>
         )}
       </Card>
 

@@ -13,7 +13,7 @@ export function Button({
   className = "",
   ...props
 }: ButtonProps) {
-  const base = "font-semibold rounded-xl transition-all active:scale-[0.97]";
+  const base = "font-semibold rounded-xl transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100";
 
   const variants = {
     primary: "bg-gradient-to-r from-[#7B2FBE] to-accent text-white",
