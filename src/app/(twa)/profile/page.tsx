@@ -173,9 +173,21 @@ export default function ProfilePage() {
           {user.referralCode && (
             <div className="mt-3">
               <p className="text-text-secondary text-xs mb-1">Твоя ссылка</p>
-              <code className="block bg-bg rounded-lg px-3 py-2 text-xs text-accent break-all">
-                t.me/BOT?start=ref_{user.referralCode}
-              </code>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-bg rounded-lg px-3 py-2 text-xs text-accent break-all">
+                  t.me/BOT?start=ref_{user.referralCode}
+                </code>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `https://t.me/BOT?start=ref_${user.referralCode}`
+                    );
+                  }}
+                >
+                  Скопировать
+                </Button>
+              </div>
             </div>
           )}
         </Card>
