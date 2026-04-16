@@ -257,9 +257,14 @@ export default function AdminPage() {
                               {p.user.displayName}
                             </p>
                             {p.user.username && (
-                              <p className="text-text-secondary text-xs">
+                              <a
+                                href={`https://t.me/${p.user.username}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-accent text-xs hover:underline"
+                              >
                                 @{p.user.username}
-                              </p>
+                              </a>
                             )}
                           </div>
                           <div className="flex gap-2">
@@ -291,14 +296,19 @@ export default function AdminPage() {
                           key={p.id}
                           className="flex items-center gap-3 bg-bg rounded-xl px-3 py-2"
                         >
-                          <p className="text-sm truncate flex-1">
+                          <div className="text-sm truncate flex-1">
                             {p.user.displayName}
                             {p.user.username && (
-                              <span className="text-text-secondary text-xs ml-1">
+                              <a
+                                href={`https://t.me/${p.user.username}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-accent text-xs ml-1 hover:underline"
+                              >
                                 @{p.user.username}
-                              </span>
+                              </a>
                             )}
-                          </p>
+                          </div>
                           <span className="text-success text-xs">✓</span>
                         </div>
                       ))}
