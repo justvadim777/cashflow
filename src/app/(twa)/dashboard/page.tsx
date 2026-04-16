@@ -82,6 +82,16 @@ export default function DashboardPage() {
             </p>
           </Card>
         </Link>
+
+        <Link href="/info" className="col-span-2">
+          <Card className="text-center hover:border-accent/30 transition-colors">
+            <div className="text-3xl mb-2">ℹ️</div>
+            <p className="font-semibold text-sm">О Cashflow</p>
+            <p className="text-text-secondary text-xs mt-1">
+              Правила, форматы игр, рейтинг
+            </p>
+          </Card>
+        </Link>
       </div>
 
       {/* Реферальный код */}
