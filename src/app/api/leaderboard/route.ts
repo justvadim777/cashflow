@@ -15,7 +15,6 @@ export async function GET(req: NextRequest) {
 
     // Для week — тоже используем totalPoints, можно доработать позже
     const players = await prisma.user.findMany({
-      where: { totalPoints: { gt: 0 } },
       orderBy: { [orderField]: "desc" },
       take: 50,
       select: {
