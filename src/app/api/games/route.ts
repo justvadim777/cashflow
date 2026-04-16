@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
             confirmed: true,
             userId: true,
             user: {
-              select: { id: true, displayName: true, avatarUrl: true, username: true, telegramId: true },
+              select: { id: true, displayName: true, avatarUrl: true, username: true },
             },
           },
         },

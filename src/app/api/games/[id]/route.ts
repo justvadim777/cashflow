@@ -25,7 +25,6 @@ export async function GET(
                 avatarUrl: true,
                 username: true,
                 totalPoints: true,
-                telegramId: true,
               },
             },
           },
