@@ -167,8 +167,8 @@ export default function LeaderboardPage() {
 
           {/* List */}
           <div className="space-y-2">
-            {rest.map((player, i) => {
-              const position = i + 4;
+            {(top3.length < 3 ? players : rest).map((player, i) => {
+              const position = top3.length < 3 ? i + 1 : i + 4;
               const isCurrentUser = player.id === userId;
 
               return (
