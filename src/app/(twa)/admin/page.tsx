@@ -40,19 +40,19 @@ const SKILL_FIELDS = [
 ] as const;
 
 const GAME_POINT_FIELDS = [
-  { key: "pointsExitRatRace", label: "Выход из крысиных бегов (+10)" },
-  { key: "pointsLiabilities", label: "Пассивы закрыты (+5)" },
-  { key: "pointsDream", label: "Мечта куплена (+10)" },
-  { key: "pointsBestIncome", label: "Лучший доход (+10)" },
-  { key: "pointsIncomeGrowth", label: "Рост дохода (+5/50k)" },
+  { key: "pointsExitRatRace", label: "Выход из крысиных бегов", points: 10 },
+  { key: "pointsLiabilities", label: "Пассивы закрыты", points: 5 },
+  { key: "pointsDream", label: "Мечта куплена", points: 10 },
+  { key: "pointsBestIncome", label: "Лучший доход", points: 10 },
+  { key: "pointsIncomeGrowth", label: "Рост дохода", points: 5 },
 ] as const;
 
 const EXTRA_POINT_FIELDS = [
-  { key: "pointsSecret", label: "Секретный балл (+5)" },
-  { key: "pointsOrder", label: "Заказ в заведении (+10)" },
-  { key: "pointsSubscription", label: "Подписка (+5)" },
-  { key: "pointsVideoReview", label: "Видео-отзыв (+5)" },
-  { key: "pointsStories", label: "Сторис (+5)" },
+  { key: "pointsSecret", label: "Секретный балл", points: 5 },
+  { key: "pointsOrder", label: "Заказ в заведении", points: 10 },
+  { key: "pointsSubscription", label: "Подписка", points: 5 },
+  { key: "pointsVideoReview", label: "Видео-отзыв", points: 5 },
+  { key: "pointsStories", label: "Сторис", points: 5 },
 ] as const;
 
 type Tab = "participants" | "results" | "games" | "analytics";
@@ -371,62 +371,92 @@ export default function AdminPage() {
             <>
               <Card>
                 <h3 className="font-semibold mb-3">Навыки (1-10)</h3>
-                <div className="space-y-2">
-                  {SKILL_FIELDS.map(({ key, label }) => (
-                    <div key={key} className="flex items-center gap-3">
-                      <label className="flex-1 text-sm">{label}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={10}
-                        value={scores[key] || 0}
-                        onChange={(e) =>
-                          setScores({ ...scores, [key]: Number(e.target.value) })
-                        }
-                        className="w-16 bg-bg border border-border rounded-lg px-2 py-1 text-center text-white"
-                      />
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  {SKILL_FIELDS.map(({ key, label }) => {
+                    const value = scores[key] || 0;
+                    return (
+                      <div key={key}>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-sm">{label}</label>
+                          <span className={`text-sm font-bold ${value > 0 ? "text-accent" : "text-text-secondary"}`}>
+                            {value}
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setScores({ ...scores, [key]: n })}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                n <= value
+                                  ? "bg-accent text-white"
+                                  : "bg-bg border border-border text-text-secondary"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </Card>
 
               <Card>
                 <h3 className="font-semibold mb-3">Игровые баллы</h3>
-                <div className="space-y-2">
-                  {GAME_POINT_FIELDS.map(({ key, label }) => (
-                    <div key={key} className="flex items-center gap-3">
-                      <label className="flex-1 text-sm">{label}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={scores[key] || 0}
-                        onChange={(e) =>
-                          setScores({ ...scores, [key]: Number(e.target.value) })
+                <div className="space-y-3">
+                  {GAME_POINT_FIELDS.map(({ key, label, points }) => {
+                    const active = (scores[key] || 0) > 0;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() =>
+                          setScores({ ...scores, [key]: active ? 0 : points })
                         }
-                        className="w-16 bg-bg border border-border rounded-lg px-2 py-1 text-center text-white"
-                      />
-                    </div>
-                  ))}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors ${
+                          active
+                            ? "bg-success/10 border-success/30 text-success"
+                            : "bg-bg border-border text-text-secondary"
+                        }`}
+                      >
+                        <span className="text-sm">{label}</span>
+                        <span className="text-xs font-bold">
+                          {active ? `+${points}` : `${points}`}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </Card>
 
               <Card>
                 <h3 className="font-semibold mb-3">Дополнительные баллы</h3>
-                <div className="space-y-2">
-                  {EXTRA_POINT_FIELDS.map(({ key, label }) => (
-                    <div key={key} className="flex items-center gap-3">
-                      <label className="flex-1 text-sm">{label}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={scores[key] || 0}
-                        onChange={(e) =>
-                          setScores({ ...scores, [key]: Number(e.target.value) })
+                <div className="space-y-3">
+                  {EXTRA_POINT_FIELDS.map(({ key, label, points }) => {
+                    const active = (scores[key] || 0) > 0;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() =>
+                          setScores({ ...scores, [key]: active ? 0 : points })
                         }
-                        className="w-16 bg-bg border border-border rounded-lg px-2 py-1 text-center text-white"
-                      />
-                    </div>
-                  ))}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors ${
+                          active
+                            ? "bg-success/10 border-success/30 text-success"
+                            : "bg-bg border-border text-text-secondary"
+                        }`}
+                      >
+                        <span className="text-sm">{label}</span>
+                        <span className="text-xs font-bold">
+                          {active ? `+${points}` : `${points}`}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </Card>
 
