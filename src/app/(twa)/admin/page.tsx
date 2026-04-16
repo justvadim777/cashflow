@@ -591,32 +591,148 @@ export default function AdminPage() {
 
       {/* Analytics tab */}
       {tab === "analytics" && analytics && (
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-4">
+          {/* Пользователи */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">ПОЛЬЗОВАТЕЛИ</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Всего</p>
+                <p className="text-2xl font-bold">{analytics.totalUsers as number}</p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">Новых за месяц</p>
+                <p className="text-2xl font-bold text-success">
+                  +{analytics.newUsersThisMonth as number}
+                </p>
+              </Card>
+            </div>
+          </div>
+
+          {/* Игры */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">ИГРЫ</p>
+            <div className="grid grid-cols-3 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Всего</p>
+                <p className="text-xl font-bold">{analytics.totalGames as number}</p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">Активных</p>
+                <p className="text-xl font-bold text-success">{analytics.activeGames as number}</p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">Завершено</p>
+                <p className="text-xl font-bold">{analytics.finishedGames as number}</p>
+              </Card>
+            </div>
+          </div>
+
+          {/* Записи */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">ЗАПИСИ НА ИГРЫ</p>
+            <div className="grid grid-cols-3 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Всего</p>
+                <p className="text-xl font-bold">{analytics.totalParticipants as number}</p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">Оплачено</p>
+                <p className="text-xl font-bold text-success">{analytics.confirmedParticipants as number}</p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">Ожидают</p>
+                <p className="text-xl font-bold text-gold">{analytics.pendingParticipants as number}</p>
+              </Card>
+            </div>
+          </div>
+
+          {/* Финансы */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">ФИНАНСЫ</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Выручка всего</p>
+                <p className="text-xl font-bold text-gold">
+                  {((analytics.totalRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">За месяц</p>
+                <p className="text-xl font-bold text-gold">
+                  {((analytics.monthRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+              </Card>
+            </div>
+            {(analytics.pendingWithdrawals as number) > 0 && (
+              <Card className="mt-3 border-gold/30">
+                <p className="text-text-secondary text-xs">Заявки на вывод</p>
+                <p className="text-xl font-bold text-gold">{analytics.pendingWithdrawals as number}</p>
+              </Card>
+            )}
+          </div>
+
+          {/* Статистика */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">СТАТИСТИКА</p>
             <Card>
-              <p className="text-text-secondary text-xs">Пользователи</p>
-              <p className="text-2xl font-bold">{analytics.totalUsers as number}</p>
-            </Card>
-            <Card>
-              <p className="text-text-secondary text-xs">Всего игр</p>
-              <p className="text-2xl font-bold">{analytics.totalGames as number}</p>
-            </Card>
-            <Card>
-              <p className="text-text-secondary text-xs">Активных</p>
-              <p className="text-2xl font-bold text-success">
-                {analytics.activeGames as number}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-text-secondary text-xs">Выручка</p>
-              <p className="text-2xl font-bold text-gold">
-                {(
-                  (analytics.totalRevenue as number) / 100
-                ).toLocaleString("ru-RU")}{" "}
-                ₽
-              </p>
+              <p className="text-text-secondary text-xs">Средний балл за игру</p>
+              <p className="text-2xl font-bold text-accent">{analytics.avgPoints as number}</p>
             </Card>
           </div>
+
+          {/* Топ игроков */}
+          {(analytics.topPlayers as { displayName: string; totalPoints: number; level: string }[])?.length > 0 && (
+            <div>
+              <p className="text-text-secondary text-xs font-semibold mb-2">ТОП-5 ИГРОКОВ</p>
+              <Card className="space-y-2">
+                {(analytics.topPlayers as { displayName: string; totalPoints: number; level: string }[]).map(
+                  (p, i) => (
+                    <div key={i} className="flex items-center justify-between py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-text-secondary text-xs w-4">{i + 1}</span>
+                        <span className="text-sm font-semibold">{p.displayName}</span>
+                      </div>
+                      <span className="text-gold text-sm font-bold">{p.totalPoints}</span>
+                    </div>
+                  )
+                )}
+              </Card>
+            </div>
+          )}
+
+          {/* Ближайшие игры */}
+          {(analytics.upcomingGames as { id: string; date: string; time: string; type: string; status: string; playersCount: number; playersLimit: number }[])?.length > 0 && (
+            <div>
+              <p className="text-text-secondary text-xs font-semibold mb-2">БЛИЖАЙШИЕ ИГРЫ</p>
+              <div className="space-y-2">
+                {(analytics.upcomingGames as { id: string; date: string; time: string; type: string; status: string; playersCount: number; playersLimit: number }[]).map(
+                  (g) => (
+                    <Card key={g.id} className="flex items-center justify-between py-3">
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {new Date(g.date).toLocaleDateString("ru-RU", {
+                            day: "numeric",
+                            month: "short",
+                          })}{" "}
+                          в {g.time}
+                        </p>
+                        <p className="text-text-secondary text-xs">{g.type}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold">
+                          {g.playersCount}/{g.playersLimit}
+                        </p>
+                        <p className={`text-xs font-semibold ${g.status === "FULL" ? "text-danger" : "text-success"}`}>
+                          {g.status === "FULL" ? "Заполнена" : "Открыта"}
+                        </p>
+                      </div>
+                    </Card>
+                  )
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
