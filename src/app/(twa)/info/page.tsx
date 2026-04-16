@@ -43,9 +43,9 @@ export default function InfoPage() {
   const [current, setCurrent] = useState(0);
 
   return (
-    <div className="flex flex-col" style={{ minHeight: "calc(100vh - 180px)" }}>
-      {/* Контент — растягивается */}
-      <div className="flex-1 overflow-y-auto">
+    <>
+      {/* Контент */}
+      <div className="pb-32">
         <AnimatePresence mode="wait">
           <motion.div
             key={current}
@@ -67,61 +67,63 @@ export default function InfoPage() {
       </div>
 
       {/* Фиксированный блок: точки + кнопки */}
-      <div className="pt-3 pb-2">
-        {/* Dots */}
-        <div className="flex justify-center gap-2 mb-4">
-          {SLIDES.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrent(i)}
-              className={`w-2 h-2 rounded-full transition-colors ${
-                i === current ? "bg-accent" : "bg-text-secondary/30"
-              }`}
-            />
-          ))}
-        </div>
+      <div className="fixed bottom-16 left-0 right-0 bg-bg/95 backdrop-blur-sm border-t border-border z-40 pb-[env(safe-area-inset-bottom)]">
+        <div className="max-w-md mx-auto px-4 py-3">
+          {/* Dots */}
+          <div className="flex justify-center gap-2 mb-3">
+            {SLIDES.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrent(i)}
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  i === current ? "bg-accent" : "bg-text-secondary/30"
+                }`}
+              />
+            ))}
+          </div>
 
-        {/* Navigation */}
-        <div className="flex gap-3 w-full">
-          {current === 0 ? (
-            <Button
-              className="flex-1"
-              onClick={() => setCurrent(current + 1)}
-            >
-              Далее
-            </Button>
-          ) : current < SLIDES.length - 1 ? (
-            <>
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => setCurrent(current - 1)}
-              >
-                Назад
-              </Button>
+          {/* Navigation */}
+          <div className="flex gap-3 w-full">
+            {current === 0 ? (
               <Button
                 className="flex-1"
                 onClick={() => setCurrent(current + 1)}
               >
                 Далее
               </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => setCurrent(current - 1)}
-              >
-                Назад
-              </Button>
-              <Link href="/games" className="flex-1 block">
-                <Button className="w-full">К играм</Button>
-              </Link>
-            </>
-          )}
+            ) : current < SLIDES.length - 1 ? (
+              <>
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => setCurrent(current - 1)}
+                >
+                  Назад
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => setCurrent(current + 1)}
+                >
+                  Далее
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => setCurrent(current - 1)}
+                >
+                  Назад
+                </Button>
+                <Link href="/games" className="flex-1 block">
+                  <Button className="w-full">К играм</Button>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
