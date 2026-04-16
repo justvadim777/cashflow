@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 import Link from "next/link";
+import Image from "next/image";
 
 const LEVEL_LABELS: Record<string, string> = {
   NEWBIE: "Новичок",
@@ -30,21 +31,21 @@ interface Achievement {
   earnedAt: string;
 }
 
-interface PointEvent {
-  id: string;
-  totalPoints: number;
-  gameId: string;
-  game?: { date: string; type: string };
-}
-
 export default function ProfilePage() {
   const user = useUserStore();
   const [tab, setTab] = useState<Tab>("achievements");
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [recentResults, setRecentResults] = useState<PointEvent[]>([]);
 
   useEffect(() => {
-    // TODO: Load achievements and recent results from API
+    async function loadProfile() {
+      try {
+        const data = await api<{ achievements: Achievement[] }>("/profile/achievements");
+        setAchievements(data.achievements);
+      } catch {
+        // achievements загрузятся при следующем визите
+      }
+    }
+    loadProfile();
   }, []);
 
   return (
@@ -64,12 +65,13 @@ export default function ProfilePage() {
       {/* Avatar */}
       <div className="flex flex-col items-center">
         <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#7B2FBE] to-accent p-[3px]">
-          <div className="w-full h-full rounded-full bg-card flex items-center justify-center text-3xl font-bold">
+          <div className="w-full h-full rounded-full bg-card flex items-center justify-center text-3xl font-bold relative">
             {user.avatarUrl ? (
-              <img
+              <Image
                 src={user.avatarUrl}
                 alt=""
-                className="w-full h-full rounded-full object-cover"
+                fill
+                className="rounded-full object-cover"
               />
             ) : (
               user.displayName?.[0] || "?"

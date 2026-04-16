@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/Card";
 import { api } from "@/lib/api";
+import Image from "next/image";
 
 interface LeaderboardPlayer {
   id: string;
@@ -33,13 +34,14 @@ function Avatar({
   const sizes = { sm: "w-8 h-8 text-xs", md: "w-12 h-12 text-sm", lg: "w-16 h-16 text-xl" };
   return (
     <div
-      className={`${sizes[size]} rounded-full bg-accent/30 flex items-center justify-center font-bold shrink-0`}
+      className={`${sizes[size]} rounded-full bg-accent/30 flex items-center justify-center font-bold shrink-0 relative`}
     >
       {player.avatarUrl ? (
-        <img
+        <Image
           src={player.avatarUrl}
           alt=""
-          className="w-full h-full rounded-full object-cover"
+          fill
+          className="rounded-full object-cover"
         />
       ) : (
         player.displayName[0]
@@ -122,7 +124,6 @@ export default function LeaderboardPage() {
             <div className="flex items-end justify-center gap-3 py-4">
               {podiumOrder.map((player, i) => {
                 const actualPlace = i === 0 ? 2 : i === 1 ? 1 : 3;
-                const heights = ["h-24", "h-32", "h-20"];
                 const borderColors = [
                   "border-gray-400",
                   "border-gold",

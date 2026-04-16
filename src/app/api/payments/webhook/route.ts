@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { checkGameAchievements, checkReferralAchievement } from "@/lib/achievements/check";
 
 // POST /api/payments/webhook — ЮКасса webhook
 export async function POST(req: NextRequest) {
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Добавить участника в игру
-    const participant = await tx.gameParticipant.create({
+    await tx.gameParticipant.create({
       data: {
         gameId,
         userId,
@@ -86,6 +87,15 @@ export async function POST(req: NextRequest) {
       });
     }
   });
+
+  // Проверить достижения после оплаты
+  await checkGameAchievements(userId);
+
+  // Проверить реферальное достижение
+  const paidUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (paidUser?.referredById) {
+    await checkReferralAchievement(paidUser.referredById);
+  }
 
   return NextResponse.json({ ok: true });
 }

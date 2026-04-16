@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import Image from "next/image";
 
 interface GameDetail {
   id: string;
@@ -170,12 +171,13 @@ export default function GameDetailPage() {
         <div className="space-y-2">
           {game.participants.map((p) => (
             <Card key={p.user.id} className="flex items-center gap-3 py-3">
-              <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center text-sm font-bold shrink-0">
+              <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center text-sm font-bold shrink-0 relative">
                 {p.user.avatarUrl ? (
-                  <img
+                  <Image
                     src={p.user.avatarUrl}
                     alt=""
-                    className="w-full h-full rounded-full object-cover"
+                    fill
+                    className="rounded-full object-cover"
                   />
                 ) : (
                   p.user.displayName[0]

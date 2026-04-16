@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import Image from "next/image";
 import Link from "next/link";
 
 interface GameParticipant {
@@ -154,14 +154,15 @@ export default function GamesPage() {
                       {game.participants.slice(0, 5).map((p) => (
                         <div
                           key={p.user.id}
-                          className="w-8 h-8 rounded-full bg-accent/30 border-2 border-card flex items-center justify-center text-xs font-bold"
+                          className="w-8 h-8 rounded-full bg-accent/30 border-2 border-card flex items-center justify-center text-xs font-bold relative"
                           title={p.user.displayName}
                         >
                           {p.user.avatarUrl ? (
-                            <img
+                            <Image
                               src={p.user.avatarUrl}
                               alt=""
-                              className="w-full h-full rounded-full object-cover"
+                              fill
+                              className="rounded-full object-cover"
                             />
                           ) : (
                             p.user.displayName[0]

@@ -3,6 +3,7 @@ import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
 import { calculateTotalPoints, calculateLevel } from "@/lib/points/calculate";
 import type { ResultInput } from "@/lib/points/calculate";
+import { checkGameAchievements } from "@/lib/achievements/check";
 
 // POST /api/results — ввод результатов (HOST / ADMIN)
 export async function POST(req: NextRequest) {
@@ -81,13 +82,53 @@ export async function POST(req: NextRequest) {
     const userTotalPoints = allResults.reduce((sum: number, r: { totalPoints: number }) => sum + r.totalPoints, 0);
     const newLevel = calculateLevel(userTotalPoints);
 
+    // Пересчитать месячные баллы (результаты текущего месяца)
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const monthlyResults = await prisma.gameResult.findMany({
+      where: {
+        userId,
+        game: { date: { gte: monthStart } },
+      },
+      select: { totalPoints: true },
+    });
+    const userMonthlyPoints = monthlyResults.reduce(
+      (sum: number, r: { totalPoints: number }) => sum + r.totalPoints,
+      0
+    );
+
+    const previousUser = await prisma.user.findUnique({ where: { id: userId } });
+    const previousLevel = previousUser?.level;
+
     await prisma.user.update({
       where: { id: userId },
       data: {
         totalPoints: userTotalPoints,
+        monthlyPoints: userMonthlyPoints,
         level: newLevel,
       },
     });
+
+    // Уведомление о новом уровне
+    if (previousLevel && previousLevel !== newLevel && previousUser) {
+      const { sendNotification } = await import("@/lib/notifications/bot");
+      const { NOTIFICATION_TEMPLATES } = await import("@/lib/notifications/templates");
+      const levelLabels: Record<string, string> = {
+        NEWBIE: "Новичок",
+        PLAYER: "Игрок",
+        INVESTOR: "Инвестор",
+        CAPITALIST: "Капиталист",
+      };
+      await sendNotification(
+        previousUser.telegramId,
+        NOTIFICATION_TEMPLATES.LEVEL_UP(levelLabels[newLevel] || newLevel)
+      );
+    }
+
+    // Проверить достижения после обновления результатов
+    await checkGameAchievements(userId);
 
     return NextResponse.json({ result, userTotalPoints, newLevel });
   });

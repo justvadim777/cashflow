@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import Image from "next/image";
 
 interface ReferralData {
   referralCode: string;
@@ -122,12 +123,13 @@ export default function ReferralPage() {
           <div className="space-y-2">
             {data.referrals.map((ref) => (
               <Card key={ref.id} className="flex items-center gap-3 py-3">
-                <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center text-sm font-bold">
+                <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center text-sm font-bold relative">
                   {ref.referred.avatarUrl ? (
-                    <img
+                    <Image
                       src={ref.referred.avatarUrl}
                       alt=""
-                      className="w-full h-full rounded-full object-cover"
+                      fill
+                      className="rounded-full object-cover"
                     />
                   ) : (
                     ref.referred.displayName[0]
