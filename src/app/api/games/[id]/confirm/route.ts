@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
 import { sendNotification } from "@/lib/notifications/bot";
+import { checkReferralAchievement } from "@/lib/achievements/check";
 
 // PATCH /api/games/[id]/confirm — админ подтверждает или отклоняет участника
 export async function PATCH(
@@ -34,6 +35,35 @@ export async function PATCH(
         where: { id: participantId },
         data: { confirmed: true },
       });
+
+      // Реферальное начисление 15% от стоимости игры
+      const paidUser = participant.user;
+      if (paidUser.referredById) {
+        const referralAmount = Math.round(participant.game.price * 0.15);
+        await prisma.referral.create({
+          data: {
+            referrerId: paidUser.referredById,
+            referredId: paidUser.id,
+            gameId,
+            amount: referralAmount,
+            status: "SUCCESS",
+          },
+        });
+        await prisma.user.update({
+          where: { id: paidUser.referredById },
+          data: { referralBalance: { increment: referralAmount } },
+        });
+
+        // Уведомление реферёру
+        const referrer = await prisma.user.findUnique({ where: { id: paidUser.referredById } });
+        if (referrer) {
+          await sendNotification(
+            referrer.telegramId,
+            `🤝 <b>Реферальный бонус!</b>\n\nТебе начислено <b>${(referralAmount / 100).toLocaleString("ru-RU")} ₽</b> за реферала ${paidUser.displayName}.`
+          );
+          await checkReferralAchievement(paidUser.referredById);
+        }
+      }
 
       const gameDate = new Date(participant.game.date).toLocaleDateString("ru-RU", {
         day: "numeric",
