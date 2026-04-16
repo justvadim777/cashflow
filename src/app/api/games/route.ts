@@ -35,14 +35,14 @@ export async function GET(req: NextRequest) {
       orderBy: { date: "asc" },
     });
 
-    // Топ-3 игрока по очкам
-    const top3 = await prisma.user.findMany({
-      orderBy: { totalPoints: "desc" },
-      where: { totalPoints: { gt: 0 } },
-      take: 3,
+    // Топ-5 игроков за месяц
+    const top5 = await prisma.user.findMany({
+      orderBy: { monthlyPoints: "desc" },
+      where: { monthlyPoints: { gt: 0 } },
+      take: 5,
       select: { id: true },
     });
-    const topPlayerIds = top3.map((p) => p.id);
+    const topPlayerIds = top5.map((p) => p.id);
 
     return NextResponse.json({ games, userId: user.id, topPlayerIds });
   });

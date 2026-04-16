@@ -14,14 +14,14 @@ export const NOTIFICATION_TEMPLATES = {
   REMINDER_2H: () =>
     `Игра начинается через 2 часа. Ждём в Остров Lounge`,
 
-  GAME_RESULT: (points: number, rank: number) =>
-    `Твой результат: ${points} баллов. Место в топе: ${rank}`,
+  GAME_RESULT: (points: number, rank: number, level: string) =>
+    `Твой результат: <b>${points}</b> баллов\nТвоё место в топе: <b>#${rank}</b>\nТвой уровень: <b>${level}</b>`,
 
   LEVEL_UP: (level: string) =>
-    `Поздравляем с переходом на уровень ${level}!`,
+    `🎉 Поздравляем с переходом на уровень <b>${level}</b>!`,
 
   UPSELL_MAIN: () =>
-    `Готов сыграть в основной лиге? Записаться в MAIN`,
+    `Ты прошёл базовый уровень. Готов сыграть в основной лиге с более сильными игроками?`,
 
   REFERRAL_EARNED: (amount: string) =>
     `Тебе начислено ${amount} по реферальной системе`,

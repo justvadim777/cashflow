@@ -28,7 +28,7 @@ interface GameDetail {
       totalPoints: number;
     };
   }[];
-  results: { totalPoints: number }[];
+  results: { totalPoints: number; userId: string; user: { displayName: string } }[];
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -206,14 +206,24 @@ export default function GameDetailPage() {
         </div>
       </div>
 
-      {/* Результат */}
+      {/* Результаты */}
       {game.results.length > 0 && (
-        <Card>
-          <p className="text-text-secondary text-sm">Ваш результат</p>
-          <p className="text-2xl font-bold text-gold">
-            {game.results[0].totalPoints} баллов
-          </p>
-        </Card>
+        <div>
+          <h2 className="text-lg font-bold mb-3">Результаты</h2>
+          <div className="space-y-2">
+            {game.results.map((r, i) => (
+              <Card key={r.userId} className="flex items-center gap-3 py-3">
+                <span className="w-6 text-center text-sm font-bold text-text-secondary">
+                  {i + 1}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{r.user.displayName}</p>
+                </div>
+                <p className="text-gold text-sm font-bold">{r.totalPoints} б.</p>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
 
       <p className="text-text-secondary text-xs text-center">

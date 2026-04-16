@@ -50,6 +50,20 @@ export default function ReferralPage() {
     }
   }
 
+  async function handleCoupon() {
+    if (!data || data.referralBalance <= 0) return;
+    try {
+      const res = await api<{ couponCode: string; message: string }>("/referral/coupon", {
+        method: "POST",
+        body: JSON.stringify({ amount: data.referralBalance }),
+      });
+      alert(res.message);
+      setData({ ...data, referralBalance: 0 });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка");
+    }
+  }
+
   function copyLink() {
     if (!data) return;
     navigator.clipboard.writeText(
@@ -91,9 +105,14 @@ export default function ReferralPage() {
           </div>
         </div>
         {data.referralBalance > 0 && (
-          <Button className="w-full mt-4" onClick={handleWithdraw}>
-            Вывести средства
-          </Button>
+          <div className="flex gap-3 mt-4">
+            <Button className="flex-1" onClick={handleWithdraw}>
+              Вывести
+            </Button>
+            <Button className="flex-1" variant="secondary" onClick={handleCoupon}>
+              Купон
+            </Button>
+          </div>
         )}
       </Card>
 

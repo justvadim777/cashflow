@@ -114,20 +114,51 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Уведомление о новом уровне
-    if (previousLevel && previousLevel !== newLevel && previousUser) {
-      const { sendNotification } = await import("@/lib/notifications/bot");
-      const { NOTIFICATION_TEMPLATES } = await import("@/lib/notifications/templates");
-      const levelLabels: Record<string, string> = {
-        NEWBIE: "Новичок",
-        PLAYER: "Игрок",
-        INVESTOR: "Инвестор",
-        CAPITALIST: "Капиталист",
-      };
-      await sendNotification(
-        previousUser.telegramId,
-        NOTIFICATION_TEMPLATES.LEVEL_UP(levelLabels[newLevel] || newLevel)
+    const { sendNotification, sendNotificationWithButton } = await import("@/lib/notifications/bot");
+    const { NOTIFICATION_TEMPLATES } = await import("@/lib/notifications/templates");
+    const levelLabels: Record<string, string> = {
+      NEWBIE: "Новичок",
+      PLAYER: "Игрок",
+      INVESTOR: "Инвестор",
+      CAPITALIST: "Капиталист",
+    };
+
+    // Позиция в рейтинге
+    const rank = await prisma.user.count({
+      where: { totalPoints: { gt: userTotalPoints } },
+    }) + 1;
+
+    // Уведомление с результатом игры
+    if (previousUser) {
+      let message = NOTIFICATION_TEMPLATES.GAME_RESULT(
+        totalPoints,
+        rank,
+        levelLabels[newLevel] || newLevel
       );
+
+      // Смена уровня
+      if (previousLevel && previousLevel !== newLevel) {
+        message += `\n\n${NOTIFICATION_TEMPLATES.LEVEL_UP(levelLabels[newLevel] || newLevel)}`;
+      }
+
+      await sendNotification(previousUser.telegramId, message);
+    }
+
+    // Upsell: после первой BASE игры → предложить MAIN
+    const game = await prisma.game.findUnique({ where: { id: gameId } });
+    if (game?.type === "BASE" && previousUser) {
+      const baseGamesCount = await prisma.gameResult.count({
+        where: { userId, game: { type: "BASE" } },
+      });
+      if (baseGamesCount === 1) {
+        const appUrl = process.env.NEXT_PUBLIC_TG_APP_URL || "";
+        await sendNotificationWithButton(
+          previousUser.telegramId,
+          NOTIFICATION_TEMPLATES.UPSELL_MAIN(),
+          "Записаться в Продвинутую",
+          `${appUrl}/games`
+        );
+      }
     }
 
     // Проверить достижения после обновления результатов

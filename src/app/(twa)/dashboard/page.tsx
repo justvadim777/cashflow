@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useUserStore } from "@/store/user";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { api } from "@/lib/api";
 import Link from "next/link";
 
 const LEVEL_LABELS: Record<string, string> = {
@@ -12,8 +14,27 @@ const LEVEL_LABELS: Record<string, string> = {
   CAPITALIST: "Капиталист",
 };
 
+const TYPE_LABELS: Record<string, string> = {
+  BASE: "Базовая",
+  MAIN: "Продвинутая",
+};
+
+interface NextGame {
+  id: string;
+  date: string;
+  time: string;
+  type: string;
+}
+
 export default function DashboardPage() {
-  const { displayName, totalPoints, level, referralCode } = useUserStore();
+  const { displayName, totalPoints, monthlyPoints, level, referralCode } = useUserStore();
+  const [nextGame, setNextGame] = useState<NextGame | null>(null);
+
+  useEffect(() => {
+    api<{ nextGame: NextGame | null }>("/games/next")
+      .then((d) => setNextGame(d.nextGame))
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -28,18 +49,49 @@ export default function DashboardPage() {
       </div>
 
       {/* Статистика */}
-      <Card className="flex items-center justify-between">
-        <div>
-          <p className="text-text-secondary text-sm">Твой уровень</p>
-          <p className="text-lg font-bold text-accent">
-            {LEVEL_LABELS[level]}
-          </p>
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-text-secondary text-sm">Твой уровень</p>
+            <p className="text-lg font-bold text-accent">
+              {LEVEL_LABELS[level]}
+            </p>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-text-secondary text-sm">Баллы</p>
-          <p className="text-2xl font-bold text-gold">{totalPoints}</p>
+        <div className="flex gap-3">
+          <div className="flex-1 bg-bg rounded-xl px-3 py-2 text-center">
+            <p className="text-text-secondary text-xs">За всё время</p>
+            <p className="text-xl font-bold text-gold">{totalPoints}</p>
+          </div>
+          <div className="flex-1 bg-bg rounded-xl px-3 py-2 text-center">
+            <p className="text-text-secondary text-xs">За месяц</p>
+            <p className="text-xl font-bold text-accent">{monthlyPoints}</p>
+          </div>
         </div>
       </Card>
+
+      {/* Ближайшая игра */}
+      {nextGame && (
+        <Link href={`/games/${nextGame.id}`}>
+          <Card className="border-accent/30 hover:border-accent/50 transition-colors">
+            <p className="text-text-secondary text-xs mb-1">Ближайшая игра</p>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">
+                {new Date(nextGame.date).toLocaleDateString("ru-RU", {
+                  day: "numeric",
+                  month: "long",
+                })}{" "}
+                в {nextGame.time}
+              </p>
+              <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
+                nextGame.type === "MAIN" ? "bg-gold/20 text-gold" : "bg-accent/20 text-accent"
+              }`}>
+                {TYPE_LABELS[nextGame.type] || nextGame.type}
+              </span>
+            </div>
+          </Card>
+        </Link>
+      )}
 
       {/* Быстрые действия */}
       <div className="grid grid-cols-2 gap-3">

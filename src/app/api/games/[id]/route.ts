@@ -30,7 +30,12 @@ export async function GET(
           },
         },
         results: {
-          where: { userId: user.id },
+          select: {
+            totalPoints: true,
+            userId: true,
+            user: { select: { displayName: true } },
+          },
+          orderBy: { totalPoints: "desc" },
         },
         createdBy: {
           select: { id: true, displayName: true },

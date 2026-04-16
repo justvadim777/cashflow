@@ -51,14 +51,14 @@ export default function ProfilePage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-text-secondary text-sm">Позиция в рейтинге</p>
-          <p className="text-3xl font-bold">—</p>
+      <div className="flex gap-3">
+        <div className="flex-1 bg-card rounded-xl px-3 py-2 text-center">
+          <p className="text-text-secondary text-xs">За всё время</p>
+          <p className="text-2xl font-bold text-gold">{user.totalPoints}</p>
         </div>
-        <div className="text-right">
-          <p className="text-text-secondary text-sm">Баллы</p>
-          <p className="text-3xl font-bold text-gold">{user.totalPoints}</p>
+        <div className="flex-1 bg-card rounded-xl px-3 py-2 text-center">
+          <p className="text-text-secondary text-xs">За месяц</p>
+          <p className="text-2xl font-bold text-accent">{user.monthlyPoints}</p>
         </div>
       </div>
 
