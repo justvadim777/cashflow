@@ -505,6 +505,23 @@ export default function AdminPage() {
                 </div>
               </Card>
 
+              <Card>
+                <h3 className="font-semibold mb-3">Выручка кальянки</h3>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Сумма заказа (₽)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={(scores.hookahRevenue || 0) / 100 || ""}
+                    onChange={(e) =>
+                      setScores({ ...scores, hookahRevenue: Math.round(Number(e.target.value) * 100) })
+                    }
+                    placeholder="0"
+                    className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+              </Card>
+
               <Button
                 className="w-full"
                 size="lg"
@@ -592,21 +609,135 @@ export default function AdminPage() {
       {/* Analytics tab */}
       {tab === "analytics" && analytics && (
         <div className="space-y-4">
-          {/* Пользователи */}
+          {/* Регистрации */}
           <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">ПОЛЬЗОВАТЕЛИ</p>
+            <p className="text-text-secondary text-xs font-semibold mb-2">РЕГИСТРАЦИИ В БОТЕ</p>
+            <div className="grid grid-cols-3 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Всего</p>
+                <p className="text-xl font-bold">{analytics.totalUsers as number}</p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">Месяц</p>
+                <p className="text-xl font-bold text-success">+{analytics.newUsersThisMonth as number}</p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">Неделя</p>
+                <p className="text-xl font-bold text-success">+{analytics.newUsersThisWeek as number}</p>
+              </Card>
+            </div>
+          </div>
+
+          {/* Игроки */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">КОЛИЧЕСТВО ИГРОКОВ</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Всего записей</p>
+                <p className="text-xl font-bold">{analytics.totalParticipants as number}</p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">Подтверждено</p>
+                <p className="text-xl font-bold text-success">{analytics.confirmedParticipants as number}</p>
+              </Card>
+            </div>
+          </div>
+
+          {/* Новые оплаченные */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">НОВЫЕ ОПЛАЧЕННЫЕ</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">За месяц</p>
+                <p className="text-xl font-bold text-success">{analytics.newPaidThisMonth as number}</p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">За неделю</p>
+                <p className="text-xl font-bold text-success">{analytics.newPaidThisWeek as number}</p>
+              </Card>
+            </div>
+          </div>
+
+          {/* Выручка по оплатам */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">ВЫРУЧКА ПО ОПЛАТАМ</p>
             <div className="grid grid-cols-2 gap-3">
               <Card>
                 <p className="text-text-secondary text-xs">Всего</p>
-                <p className="text-2xl font-bold">{analytics.totalUsers as number}</p>
+                <p className="text-xl font-bold text-gold">
+                  {((analytics.totalRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
               </Card>
               <Card>
-                <p className="text-text-secondary text-xs">Новых за месяц</p>
-                <p className="text-2xl font-bold text-success">
-                  +{analytics.newUsersThisMonth as number}
+                <p className="text-text-secondary text-xs">За месяц</p>
+                <p className="text-xl font-bold text-gold">
+                  {((analytics.monthRevenue as number) / 100).toLocaleString("ru-RU")} ₽
                 </p>
               </Card>
             </div>
+          </div>
+
+          {/* Выручка кальянки */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">ВЫРУЧКА КАЛЬЯНКИ</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Всего</p>
+                <p className="text-xl font-bold text-gold">
+                  {((analytics.hookahRevenueTotal as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">За месяц</p>
+                <p className="text-xl font-bold text-gold">
+                  {((analytics.hookahRevenueMonth as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+              </Card>
+            </div>
+          </div>
+
+          {/* Средний чек кальянки */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">СРЕДНИЙ ЧЕК КАЛЬЯНКИ</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Всего</p>
+                <p className="text-xl font-bold text-accent">
+                  {((analytics.hookahAvgTotal as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">За месяц</p>
+                <p className="text-xl font-bold text-accent">
+                  {((analytics.hookahAvgMonth as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+              </Card>
+            </div>
+          </div>
+
+          {/* Реферальная программа */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">СУММА В РЕФЕРАЛЬНУЮ</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Всего</p>
+                <p className="text-xl font-bold text-gold">
+                  {((analytics.referralTotal as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">За месяц</p>
+                <p className="text-xl font-bold text-gold">
+                  {((analytics.referralMonth as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+              </Card>
+            </div>
+            {(analytics.pendingWithdrawals as number) > 0 && (
+              <Card className="mt-3 border-gold/30">
+                <p className="text-text-secondary text-xs">Заявки на вывод</p>
+                <p className="text-xl font-bold text-gold">{analytics.pendingWithdrawals as number}</p>
+              </Card>
+            )}
           </div>
 
           {/* Игры */}
@@ -626,50 +757,6 @@ export default function AdminPage() {
                 <p className="text-xl font-bold">{analytics.finishedGames as number}</p>
               </Card>
             </div>
-          </div>
-
-          {/* Записи */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">ЗАПИСИ НА ИГРЫ</p>
-            <div className="grid grid-cols-3 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Всего</p>
-                <p className="text-xl font-bold">{analytics.totalParticipants as number}</p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">Оплачено</p>
-                <p className="text-xl font-bold text-success">{analytics.confirmedParticipants as number}</p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">Ожидают</p>
-                <p className="text-xl font-bold text-gold">{analytics.pendingParticipants as number}</p>
-              </Card>
-            </div>
-          </div>
-
-          {/* Финансы */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">ФИНАНСЫ</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Выручка всего</p>
-                <p className="text-xl font-bold text-gold">
-                  {((analytics.totalRevenue as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">За месяц</p>
-                <p className="text-xl font-bold text-gold">
-                  {((analytics.monthRevenue as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-            </div>
-            {(analytics.pendingWithdrawals as number) > 0 && (
-              <Card className="mt-3 border-gold/30">
-                <p className="text-text-secondary text-xs">Заявки на вывод</p>
-                <p className="text-xl font-bold text-gold">{analytics.pendingWithdrawals as number}</p>
-              </Card>
-            )}
           </div>
 
           {/* Статистика */}

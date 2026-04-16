@@ -178,6 +178,9 @@ model GameResult {
 
   totalPoints        Int @default(0) @map("total_points")
 
+  // Выручка кальянки (в копейках)
+  hookahRevenue      Int @default(0) @map("hookah_revenue")
+
   @@unique([gameId, userId])
   @@map("game_results")
 }

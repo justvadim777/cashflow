@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
     };
 
     const totalPoints = calculateTotalPoints(resultInput);
+    const hookahRevenue = scores.hookahRevenue || 0;
 
     const result = await prisma.gameResult.upsert({
       where: { gameId_userId: { gameId, userId } },
@@ -67,10 +68,12 @@ export async function POST(req: NextRequest) {
         userId,
         ...resultInput,
         totalPoints,
+        hookahRevenue,
       },
       update: {
         ...resultInput,
         totalPoints,
+        hookahRevenue,
       },
     });
 
