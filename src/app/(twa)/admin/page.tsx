@@ -39,12 +39,11 @@ const SKILL_FIELDS = [
   { key: "skillEngagement", label: "Вовлечённость" },
 ] as const;
 
-const GAME_POINT_FIELDS = [
+const GAME_POINT_TOGGLES = [
   { key: "pointsExitRatRace", label: "Выход из крысиных бегов", points: 10 },
   { key: "pointsLiabilities", label: "Пассивы закрыты", points: 5 },
   { key: "pointsDream", label: "Мечта куплена", points: 10 },
   { key: "pointsBestIncome", label: "Лучший доход", points: 10 },
-  { key: "pointsIncomeGrowth", label: "Рост дохода", points: 5 },
 ] as const;
 
 const EXTRA_POINT_FIELDS = [
@@ -407,7 +406,7 @@ export default function AdminPage() {
               <Card>
                 <h3 className="font-semibold mb-3">Игровые баллы</h3>
                 <div className="space-y-3">
-                  {GAME_POINT_FIELDS.map(({ key, label, points }) => {
+                  {GAME_POINT_TOGGLES.map(({ key, label, points }) => {
                     const active = (scores[key] || 0) > 0;
                     return (
                       <button
@@ -429,6 +428,52 @@ export default function AdminPage() {
                       </button>
                     );
                   })}
+
+                  {/* Рост дохода — шаг +5 */}
+                  <div className="px-3 py-2.5 rounded-xl border border-border bg-bg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-text-secondary">Рост дохода (+5 за 50k)</span>
+                      <span className={`text-sm font-bold ${(scores.pointsIncomeGrowth || 0) > 0 ? "text-success" : "text-text-secondary"}`}>
+                        +{scores.pointsIncomeGrowth || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setScores({ ...scores, pointsIncomeGrowth: Math.max(0, (scores.pointsIncomeGrowth || 0) - 5) })
+                        }
+                        className="w-10 h-10 rounded-xl bg-card border border-border text-white font-bold text-lg"
+                      >
+                        −
+                      </button>
+                      <div className="flex-1 flex gap-1">
+                        {[5, 10, 15, 20, 25].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setScores({ ...scores, pointsIncomeGrowth: n })}
+                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${
+                              (scores.pointsIncomeGrowth || 0) === n
+                                ? "bg-success text-white"
+                                : "bg-card border border-border text-text-secondary"
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setScores({ ...scores, pointsIncomeGrowth: (scores.pointsIncomeGrowth || 0) + 5 })
+                        }
+                        className="w-10 h-10 rounded-xl bg-card border border-border text-white font-bold text-lg"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </Card>
 
