@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     // Для week — тоже используем totalPoints, можно доработать позже
     const players = await prisma.user.findMany({
-      where: { role: "PLAYER" },
+      where: { totalPoints: { gt: 0 } },
       orderBy: { [orderField]: "desc" },
       take: 50,
       select: {
@@ -37,7 +37,6 @@ export async function GET(req: NextRequest) {
       // Пользователь не в топ-50 — посчитаем его позицию
       const count = await prisma.user.count({
         where: {
-          role: "PLAYER",
           [orderField]: { gt: user[orderField] },
         },
       });
