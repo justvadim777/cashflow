@@ -98,13 +98,6 @@ export default function GameDetailPage() {
 
   return (
     <div className="space-y-4">
-      <button
-        onClick={() => router.back()}
-        className="text-text-secondary text-sm hover:text-white transition-colors"
-      >
-        &larr; Назад
-      </button>
-
       <div className="flex items-center gap-3">
         <span
           className={`px-3 py-1 rounded-lg text-sm font-bold ${
