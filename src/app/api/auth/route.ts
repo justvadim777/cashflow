@@ -55,12 +55,32 @@ export async function POST(req: NextRequest) {
         role: assignedRole,
       },
     });
-  } else if (ADMIN_IDS[tgUser.id.toString()] && user.role === "PLAYER") {
-    // Если пользователь уже существует, но ещё PLAYER — обновить роль
-    user = await prisma.user.update({
-      where: { telegramId },
-      data: { role: ADMIN_IDS[tgUser.id.toString()] },
-    });
+  } else {
+    // Пользователь уже есть — проверяем обновления
+    const updates: { role?: UserRole; referredById?: string } = {};
+
+    // Обновить роль, если админский ID и ещё PLAYER
+    if (ADMIN_IDS[tgUser.id.toString()] && user.role === "PLAYER") {
+      updates.role = ADMIN_IDS[tgUser.id.toString()];
+    }
+
+    // Привязать реферала, если ещё не привязан и есть startParam
+    if (!user.referredById && startParam?.startsWith("ref_")) {
+      const code = startParam.replace("ref_", "");
+      const referrer = await prisma.user.findUnique({
+        where: { referralCode: code },
+      });
+      if (referrer && referrer.id !== user.id) {
+        updates.referredById = referrer.id;
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      user = await prisma.user.update({
+        where: { telegramId },
+        data: updates,
+      });
+    }
   }
 
   return NextResponse.json({
