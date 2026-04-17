@@ -6,10 +6,21 @@ import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 import Image from "next/image";
 
+interface InvitedUser {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+  username: string | null;
+  createdAt: string;
+  earned: number;
+  paidGames: number;
+}
+
 interface ReferralData {
   referralCode: string;
   referralBalance: number;
   totalEarned: number;
+  invited: InvitedUser[];
   referrals: {
     id: string;
     amount: number;
@@ -141,42 +152,42 @@ export default function ReferralPage() {
         </div>
       </Card>
 
-      {/* История */}
+      {/* Приглашённые */}
       <div>
         <h2 className="text-lg font-bold mb-3">
-          Рефералы ({data.referrals.length})
+          Приглашённые ({data.invited.length})
         </h2>
-        {data.referrals.length === 0 ? (
+        {data.invited.length === 0 ? (
           <Card className="text-center py-6">
-            <p className="text-text-secondary">Пока нет рефералов</p>
+            <p className="text-text-secondary text-sm">Пока никого не пригласил</p>
+            <p className="text-text-secondary text-xs mt-1">Поделись ссылкой выше</p>
           </Card>
         ) : (
           <div className="space-y-2">
-            {data.referrals.map((ref) => (
-              <Card key={ref.id} className="flex items-center gap-3 py-3">
+            {data.invited.map((u) => (
+              <Card key={u.id} className="flex items-center gap-3 py-3">
                 <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center text-sm font-bold relative">
-                  {ref.referred.avatarUrl ? (
+                  {u.avatarUrl ? (
                     <Image
-                      src={ref.referred.avatarUrl}
+                      src={u.avatarUrl}
                       alt=""
                       fill
                       className="rounded-full object-cover"
                     />
                   ) : (
-                    ref.referred.displayName[0]
+                    u.displayName[0]
                   )}
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">
-                    {ref.referred.displayName}
-                  </p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{u.displayName}</p>
                   <p className="text-text-secondary text-xs">
-                    {new Date(ref.createdAt).toLocaleDateString("ru-RU")} —{" "}
-                    {ref.game.type}
+                    {u.paidGames > 0
+                      ? `Оплатил игр: ${u.paidGames}`
+                      : "Ещё не играл"}
                   </p>
                 </div>
-                <p className="text-success text-sm font-bold">
-                  +{(ref.amount / 100).toLocaleString("ru-RU")} ₽
+                <p className={`text-sm font-bold ${u.earned > 0 ? "text-success" : "text-text-secondary"}`}>
+                  {u.earned > 0 ? `+${(u.earned / 100).toLocaleString("ru-RU")} ₽` : "—"}
                 </p>
               </Card>
             ))}
