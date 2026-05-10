@@ -33,14 +33,16 @@ cp -r public .next/standalone/public
 # 5. Перезапуск сервисов
 echo ">>> Перезапуск сервисов..."
 systemctl restart cashflow
-systemctl restart cashflow-bot
 systemctl enable cashflow
-systemctl enable cashflow-bot
+
+# 6. Регистрация webhook бота
+echo ">>> Установка Telegram webhook..."
+DOMAIN=$(grep NEXT_PUBLIC_TG_APP_URL $APP_DIR/.env.production | cut -d'"' -f2)
+npx tsx $APP_DIR/scripts/set-webhook.ts $DOMAIN --env-file=$APP_DIR/.env.production 2>&1 || true
 
 echo ""
 echo ">>> Проверка статуса..."
 systemctl status cashflow --no-pager -l | head -5
-systemctl status cashflow-bot --no-pager -l | head -5
 
 echo ""
 echo "=== Deploy завершён ==="

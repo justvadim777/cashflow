@@ -103,25 +103,8 @@ EnvironmentFile=$APP_DIR/.env.production
 WantedBy=multi-user.target
 SERVICE
 
-# 10. Systemd сервис для Telegram бота
-echo ">>> Создание systemd-сервиса (bot)..."
-cat > /etc/systemd/system/cashflow-bot.service <<SERVICE
-[Unit]
-Description=Cashflow Telegram Bot
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=$APP_DIR
-ExecStart=/usr/bin/npx tsx scripts/bot-polling.ts
-Restart=on-failure
-RestartSec=5
-EnvironmentFile=$APP_DIR/.env.production
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
+# 10. Примечание: бот работает через webhook, polling только локально
+echo ">>> Бот настраивается через webhook после деплоя (polling — только для локальной разработки)"
 
 systemctl daemon-reload
 
