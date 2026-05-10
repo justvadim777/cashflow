@@ -12,7 +12,13 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     async function init() {
       try {
         const { retrieveRawInitData } = await import("@tma.js/sdk");
-        const rawInitData = retrieveRawInitData();
+        let rawInitData: string | undefined;
+        try {
+          rawInitData = retrieveRawInitData();
+        } catch {
+          // Fallback for environments where SDK can't read hash (e.g., headless browsers in tests)
+          rawInitData = (window as unknown as { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp?.initData || undefined;
+        }
 
         if (!rawInitData) {
           reset();
