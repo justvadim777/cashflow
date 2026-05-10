@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sendNotification } from "@/lib/notifications/bot";
 
 // Атомарно увеличивает players_count только если есть место.
 // Возвращает true если место было захвачено.
@@ -14,7 +15,7 @@ export async function tryIncrementPlayers(gameId: string): Promise<boolean> {
   return result === 1;
 }
 
-// Атомарно уменьшает players_count и при необходимости возвращает статус OPEN.
+// Атомарно уменьшает players_count и уведомляет следующего из waitlist.
 export async function decrementPlayers(gameId: string): Promise<void> {
   await prisma.$executeRaw`
     UPDATE games
@@ -22,4 +23,22 @@ export async function decrementPlayers(gameId: string): Promise<void> {
         status = CASE WHEN status = 'FULL' THEN 'OPEN' ELSE status END
     WHERE id = ${gameId}
   `;
+
+  // Уведомить первого из waitlist кто ещё не notified
+  const next = await prisma.gameWaitlist.findFirst({
+    where: { gameId, notifiedAt: null },
+    orderBy: { joinedAt: "asc" },
+    include: { user: true },
+  });
+
+  if (next) {
+    await prisma.gameWaitlist.update({
+      where: { id: next.id },
+      data: { notifiedAt: new Date() },
+    });
+    await sendNotification(
+      next.user.telegramId,
+      `Освободилось место в игре! Оплати в течение 30 минут, иначе место перейдёт следующему.`
+    );
+  }
 }
