@@ -46,7 +46,17 @@ const EXTRA_POINT_FIELDS = [
   { key: "pointsStories", label: "Сторис (+5)" },
 ] as const;
 
-type Tab = "results" | "analytics" | "games";
+interface RefundRequest {
+  id: string;
+  amount: number;
+  reason: string | null;
+  status: "CREATED" | "PROCESSING" | "DONE";
+  createdAt: string;
+  user: { displayName: string };
+  game: { date: string; time: string };
+}
+
+type Tab = "results" | "analytics" | "games" | "refunds";
 
 export default function AdminPage() {
   const { role } = useUserStore();
@@ -57,6 +67,7 @@ export default function AdminPage() {
   const [scores, setScores] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [analytics, setAnalytics] = useState<Record<string, unknown> | null>(null);
+  const [refunds, setRefunds] = useState<RefundRequest[]>([]);
 
   // Создание игры
   const [newGame, setNewGame] = useState({
@@ -90,6 +101,9 @@ export default function AdminPage() {
     if (isAdmin || isOwner) {
       api<Record<string, unknown>>("/analytics")
         .then(setAnalytics)
+        .catch(() => {});
+      api<{ refunds: RefundRequest[] }>("/admin/refunds/all")
+        .then((d) => setRefunds(d.refunds))
         .catch(() => {});
     }
   }, [isAdmin, isHost, isOwner]);
@@ -172,6 +186,16 @@ export default function AdminPage() {
             }`}
           >
             Аналитика
+          </button>
+        )}
+        {(isAdmin || isOwner) && (
+          <button
+            onClick={() => setTab("refunds")}
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
+              tab === "refunds" ? "bg-accent text-white" : "text-text-secondary"
+            }`}
+          >
+            Возвраты
           </button>
         )}
       </div>
@@ -361,6 +385,61 @@ export default function AdminPage() {
             Создать игру
           </Button>
         </Card>
+      )}
+
+      {/* Refunds tab */}
+      {tab === "refunds" && (
+        <div className="space-y-3">
+          <h2 className="font-semibold text-lg">Заявки на возврат</h2>
+          {refunds.length === 0 && (
+            <Card className="text-center text-text-secondary py-6">Нет заявок</Card>
+          )}
+          {refunds.map((r) => (
+            <Card key={r.id} className="space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-semibold">{r.user.displayName}</p>
+                  <p className="text-text-secondary text-xs">
+                    {new Date(r.game.date).toLocaleDateString("ru-RU")} {r.game.time}
+                  </p>
+                  {r.reason && <p className="text-sm mt-1">{r.reason}</p>}
+                </div>
+                <div className="text-right">
+                  <p className="text-gold font-bold">{(r.amount / 100).toLocaleString("ru-RU")} ₽</p>
+                  <p className={`text-xs font-semibold ${r.status === "DONE" ? "text-success" : r.status === "PROCESSING" ? "text-gold" : "text-text-secondary"}`}>
+                    {r.status === "CREATED" ? "Новая" : r.status === "PROCESSING" ? "В работе" : "Готово"}
+                  </p>
+                </div>
+              </div>
+              {r.status !== "DONE" && (
+                <div className="flex gap-2">
+                  {r.status === "CREATED" && (
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      onClick={async () => {
+                        await api(`/admin/refunds/${r.id}`, { method: "PATCH", body: JSON.stringify({ status: "PROCESSING" }) });
+                        setRefunds((prev) => prev.map((x) => x.id === r.id ? { ...x, status: "PROCESSING" } : x));
+                      }}
+                    >
+                      Взять в работу
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-success/20 text-success"
+                    onClick={async () => {
+                      await api(`/admin/refunds/${r.id}`, { method: "PATCH", body: JSON.stringify({ status: "DONE" }) });
+                      setRefunds((prev) => prev.map((x) => x.id === r.id ? { ...x, status: "DONE" } : x));
+                    }}
+                  >
+                    Готово
+                  </Button>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
       )}
 
       {/* Analytics tab */}
