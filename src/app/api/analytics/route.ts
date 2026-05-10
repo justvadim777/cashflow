@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       activeGames,
       recentPayments,
       pendingWithdrawals,
-      periodPayments,
+      paidCount,
       yukassaRevenue,
       cashRevenue,
     ] = await Promise.all([
@@ -42,10 +42,9 @@ export async function GET(req: NextRequest) {
         include: { user: { select: { displayName: true } } },
         orderBy: { createdAt: "desc" },
       }),
-      // Все успешные оплаты за период (для paidCount и firstPaidCount)
-      prisma.payment.findMany({
+      // Счётчик оплат за период
+      prisma.payment.count({
         where: { status: "SUCCESS", createdAt: { gte: start, lte: end } },
-        select: { id: true, userId: true, createdAt: true },
       }),
       // ЮКасса-выручка за период
       prisma.payment.aggregate({
@@ -64,17 +63,21 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    // firstPaidCount — оплаты, где это первая оплата юзера за всё время
-    const firstPaidCount = (
-      await Promise.all(
-        periodPayments.map(async (p) => {
-          const earlier = await prisma.payment.count({
-            where: { userId: p.userId, status: "SUCCESS", createdAt: { lt: p.createdAt } },
-          });
-          return earlier === 0;
-        })
-      )
-    ).filter(Boolean).length;
+    // firstPaidCount — оплаты, где это первая оплата юзера (один SQL-запрос)
+    const firstPaidRows: Array<{ count: bigint }> = await prisma.$queryRaw`
+      SELECT COUNT(*)::bigint AS count
+      FROM payments p
+      WHERE p.status = 'SUCCESS'
+        AND p.created_at >= ${start}
+        AND p.created_at <= ${end}
+        AND NOT EXISTS (
+          SELECT 1 FROM payments p2
+          WHERE p2.user_id = p.user_id
+            AND p2.status = 'SUCCESS'
+            AND p2.created_at < p.created_at
+        )
+    `;
+    const firstPaidCount = Number(firstPaidRows[0]?.count ?? 0);
 
     const yukassaRev = yukassaRevenue._sum.amount ?? 0;
     const cashRev = cashRevenue._sum.manualPaidAmount ?? 0;
@@ -90,7 +93,7 @@ export async function GET(req: NextRequest) {
       cashRevenue: cashRev,
       totalRevenue: yukassaRev + cashRev,
       // Оплаты за период
-      paidCount: periodPayments.length,
+      paidCount,
       firstPaidCount,
     });
   });
