@@ -128,6 +128,7 @@ NEXTAUTH_SECRET_VAL=$(grep NEXTAUTH_SECRET $APP_DIR/.env.production | cut -d'"' 
 (crontab -l 2>/dev/null; cat <<CRON
 # Cashflow cron jobs
 */15 * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/notify-upcoming >> /var/log/cashflow-cron.log 2>&1
+0 12 * * *  curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/notify-inactive >> /var/log/cashflow-cron.log 2>&1
 */5  * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/cleanup-pending >> /var/log/cashflow-cron.log 2>&1
 */15 * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/finish-games >> /var/log/cashflow-cron.log 2>&1
 */5  * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/expire-waitlist >> /var/log/cashflow-cron.log 2>&1
