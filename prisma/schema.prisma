@@ -230,6 +230,17 @@ model Achievement {
   @@map("achievements")
 }
 
+model AuditLog {
+  id              String   @id @default(cuid())
+  actorTelegramId BigInt   @map("actor_telegram_id")
+  action          String
+  target          String?
+  payload         Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
 model GameWaitlist {
   id         String    @id @default(cuid())
   gameId     String    @map("game_id")

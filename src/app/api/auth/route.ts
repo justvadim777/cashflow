@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateInitData } from "@/lib/telegram/validate";
 import { prisma } from "@/lib/db";
 import { getRoleByTelegramId } from "@/lib/telegram/roles";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { audit } from "@/lib/audit";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -14,6 +16,11 @@ export async function POST(req: NextRequest) {
 
   const { user: tgUser, startParam } = initData;
   const telegramId = BigInt(tgUser.id);
+
+  const rl = checkRateLimit(`auth:${telegramId}`);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
 
   let user = await prisma.user.findUnique({
     where: { telegramId },
@@ -39,6 +46,7 @@ export async function POST(req: NextRequest) {
 
     const role = getRoleByTelegramId(telegramId);
 
+    await audit("ROLE_CHANGE", telegramId, `new user ${telegramId}`, { role });
     user = await prisma.user.create({
       data: {
         telegramId,

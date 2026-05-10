@@ -3,6 +3,7 @@ import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
 import { sendNotification } from "@/lib/notifications/bot";
 import { decrementPlayers } from "@/lib/games/atomic-join";
+import { audit } from "@/lib/audit";
 
 // PATCH /api/games/[id]/confirm — подтверждение/отклонение записи (ADMIN)
 // body: { userId: string, action: "confirm" | "reject" }
@@ -31,6 +32,12 @@ export async function PATCH(
     if (!participant) {
       return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     }
+
+    await audit(
+      action === "confirm" ? "PARTICIPANT_CONFIRM" : "PARTICIPANT_REJECT",
+      user.telegramId,
+      `game:${gameId} user:${userId}`
+    );
 
     if (action === "confirm") {
       await prisma.gameParticipant.update({

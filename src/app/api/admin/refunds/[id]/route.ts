@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
 import { sendNotification } from "@/lib/notifications/bot";
+import { audit } from "@/lib/audit";
 
 // PATCH /api/admin/refunds/[id] — обновление статуса возврата (ADMIN/OWNER)
 export async function PATCH(
@@ -29,6 +30,8 @@ export async function PATCH(
     if (!refund) {
       return NextResponse.json({ error: "Refund request not found" }, { status: 404 });
     }
+
+    await audit("REFUND_STATUS_CHANGE", user.telegramId, `refund:${id}`, { status });
 
     const updated = await prisma.refundRequest.update({
       where: { id },
