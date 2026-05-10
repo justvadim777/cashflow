@@ -6,6 +6,7 @@ import type { ResultInput } from "@/lib/points/calculate";
 import { checkGameAchievements } from "@/lib/achievements/check";
 import { sendNotification } from "@/lib/notifications/bot";
 import { NOTIFICATION_TEMPLATES } from "@/lib/notifications/templates";
+import { audit } from "@/lib/audit";
 
 // POST /api/results — ввод результатов (HOST / ADMIN)
 export async function POST(req: NextRequest) {
@@ -59,6 +60,8 @@ export async function POST(req: NextRequest) {
     };
 
     const totalPoints = calculateTotalPoints(resultInput);
+
+    await audit("GAME_RESULT_SAVE", user.telegramId, `game:${gameId} user:${userId}`, { totalPoints });
 
     const result = await prisma.gameResult.upsert({
       where: { gameId_userId: { gameId, userId } },

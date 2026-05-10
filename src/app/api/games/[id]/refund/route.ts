@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
 import { sendNotification } from "@/lib/notifications/bot";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // POST /api/games/[id]/refund — игрок создаёт заявку на возврат
 export async function POST(
@@ -9,6 +10,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(req, async (_req, { user }) => {
+    const rl = checkRateLimit(`refund:${user.telegramId}`);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const { id: gameId } = await params;
     const body = await _req.json();
     const { reason } = body as { reason?: string };
