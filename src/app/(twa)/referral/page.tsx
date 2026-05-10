@@ -5,18 +5,24 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 
+interface ReferralEntry {
+  id: string;
+  displayName: string;
+  username: string | null;
+  avatarUrl: string | null;
+  joinedAt: string;
+  hasPaid: boolean;
+  totalPaid: number;
+  earnedFromHim: number;
+}
+
 interface ReferralData {
   referralCode: string;
-  referralBalance: number;
+  totalCount: number;
+  paidCount: number;
   totalEarned: number;
-  referrals: {
-    id: string;
-    amount: number;
-    status: string;
-    createdAt: string;
-    referred: { displayName: string; avatarUrl: string | null };
-    game: { date: string; type: string };
-  }[];
+  balance: number;
+  referrals: ReferralEntry[];
 }
 
 export default function ReferralPage() {
@@ -37,13 +43,13 @@ export default function ReferralPage() {
   }, []);
 
   async function handleWithdraw() {
-    if (!data || data.referralBalance <= 0) return;
+    if (!data || data.balance <= 0) return;
     try {
       await api("/referral/withdraw", {
         method: "POST",
-        body: JSON.stringify({ amount: data.referralBalance }),
+        body: JSON.stringify({ amount: data.balance }),
       });
-      setData({ ...data, referralBalance: 0 });
+      setData({ ...data, balance: 0 });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Ошибка");
     }
@@ -73,23 +79,35 @@ export default function ReferralPage() {
         Приглашай друзей и получай 15% с каждой оплаты
       </p>
 
+      {/* Счётчики */}
+      <div className="grid grid-cols-3 gap-2">
+        <Card className="text-center py-3">
+          <p className="text-2xl font-bold">{data.totalCount}</p>
+          <p className="text-text-secondary text-xs mt-1">Рефералов</p>
+        </Card>
+        <Card className="text-center py-3">
+          <p className="text-2xl font-bold text-success">{data.paidCount}</p>
+          <p className="text-text-secondary text-xs mt-1">Оплатили</p>
+        </Card>
+        <Card className="text-center py-3">
+          <p className="text-lg font-bold text-gold">
+            {(data.totalEarned / 100).toLocaleString("ru-RU")} ₽
+          </p>
+          <p className="text-text-secondary text-xs mt-1">Заработано</p>
+        </Card>
+      </div>
+
       {/* Баланс */}
       <Card>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-text-secondary text-sm">Баланс</p>
+            <p className="text-text-secondary text-sm">Доступно к выводу</p>
             <p className="text-3xl font-bold text-gold">
-              {(data.referralBalance / 100).toLocaleString("ru-RU")} ₽
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-text-secondary text-sm">Всего заработано</p>
-            <p className="text-lg font-semibold text-success">
-              {(data.totalEarned / 100).toLocaleString("ru-RU")} ₽
+              {(data.balance / 100).toLocaleString("ru-RU")} ₽
             </p>
           </div>
         </div>
-        {data.referralBalance > 0 && (
+        {data.balance > 0 && (
           <Button className="w-full mt-4" onClick={handleWithdraw}>
             Вывести средства
           </Button>
@@ -109,10 +127,10 @@ export default function ReferralPage() {
         </div>
       </Card>
 
-      {/* История */}
+      {/* Список рефералов */}
       <div>
         <h2 className="text-lg font-bold mb-3">
-          Рефералы ({data.referrals.length})
+          Рефералы ({data.totalCount})
         </h2>
         {data.referrals.length === 0 ? (
           <Card className="text-center py-6">
@@ -122,29 +140,39 @@ export default function ReferralPage() {
           <div className="space-y-2">
             {data.referrals.map((ref) => (
               <Card key={ref.id} className="flex items-center gap-3 py-3">
-                <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center text-sm font-bold">
-                  {ref.referred.avatarUrl ? (
+                <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center text-sm font-bold shrink-0 relative">
+                  {ref.avatarUrl ? (
                     <img
-                      src={ref.referred.avatarUrl}
+                      src={ref.avatarUrl}
                       alt=""
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    ref.referred.displayName[0]
+                    ref.displayName[0]
+                  )}
+                  {ref.hasPaid && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-success rounded-full flex items-center justify-center text-[9px] text-white font-bold">
+                      ✓
+                    </span>
                   )}
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">
-                    {ref.referred.displayName}
-                  </p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{ref.displayName}</p>
+                  {ref.username && (
+                    <p className="text-text-secondary text-xs">@{ref.username}</p>
+                  )}
                   <p className="text-text-secondary text-xs">
-                    {new Date(ref.createdAt).toLocaleDateString("ru-RU")} —{" "}
-                    {ref.game.type}
+                    {new Date(ref.joinedAt).toLocaleDateString("ru-RU")}
+                    {!ref.hasPaid && (
+                      <span className="text-gold ml-1">• не оплатил</span>
+                    )}
                   </p>
                 </div>
-                <p className="text-success text-sm font-bold">
-                  +{(ref.amount / 100).toLocaleString("ru-RU")} ₽
-                </p>
+                {ref.earnedFromHim > 0 && (
+                  <p className="text-success text-sm font-bold shrink-0">
+                    +{(ref.earnedFromHim / 100).toLocaleString("ru-RU")} ₽
+                  </p>
+                )}
               </Card>
             ))}
           </div>
