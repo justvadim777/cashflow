@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateInitData } from "@/lib/telegram/validate";
 import { prisma } from "@/lib/db";
+import { getRoleByTelegramId } from "@/lib/telegram/roles";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -36,6 +37,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const role = getRoleByTelegramId(telegramId);
+
     user = await prisma.user.create({
       data: {
         telegramId,
@@ -44,8 +47,19 @@ export async function POST(req: NextRequest) {
         avatarUrl: tgUser.photo_url || null,
         referralCode,
         referredById,
+        role,
       },
     });
+  } else {
+    // Обновить роль если в .env она выше текущей
+    const envRole = getRoleByTelegramId(telegramId);
+    const roleOrder: Record<string, number> = { PLAYER: 0, HOST: 1, ADMIN: 2, OWNER: 3 };
+    if (roleOrder[envRole] > roleOrder[user.role]) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { role: envRole },
+      });
+    }
   }
 
   return NextResponse.json({
