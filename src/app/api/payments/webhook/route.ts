@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendNotification } from "@/lib/notifications/bot";
+import { isYukassaIp } from "@/lib/payments/yukassa-ips";
+import { verifyWebhookSignature } from "@/lib/payments/yukassa";
 
 // POST /api/payments/webhook — ЮКасса webhook
 export async function POST(req: NextRequest) {
+  // IP whitelist (только в production)
+  if (process.env.NODE_ENV === "production") {
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      req.headers.get("x-real-ip") ??
+      "";
+    if (!isYukassaIp(ip)) {
+      return NextResponse.json({ error: "Forbidden IP" }, { status: 403 });
+    }
+  }
+
   const body = await req.text();
+
+  // Проверка HMAC-подписи (если задана)
+  const signature = req.headers.get("Signature") ?? "";
+  if (process.env.YUKASSA_WEBHOOK_SECRET && !verifyWebhookSignature(body, signature)) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+  }
+
   let event: {
     type: string;
     event: string;
