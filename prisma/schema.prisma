@@ -228,6 +228,17 @@ model Achievement {
   @@map("achievements")
 }
 
+model NotificationLog {
+  id     String   @id @default(cuid())
+  userId String   @map("user_id")
+  gameId String   @map("game_id")
+  type   String   // 'PRE_48H' | 'PRE_24H' | 'PRE_2H' | 'POST_GAME' | 'LEVEL_UP' | 'INACTIVE_30D'
+  sentAt DateTime @default(now()) @map("sent_at")
+
+  @@unique([userId, gameId, type])
+  @@map("notification_logs")
+}
+
 model RefundRequest {
   id          String           @id @default(cuid())
   userId      String           @map("user_id")
