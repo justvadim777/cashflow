@@ -55,6 +55,11 @@ enum AchievementType {
   FIRST_REFERRAL
 }
 
+enum PaymentMethod {
+  YUKASSA
+  CASH
+}
+
 // ============ Models ============
 
 model User {
@@ -113,14 +118,16 @@ model Game {
 }
 
 model GameParticipant {
-  id        String   @id @default(cuid())
-  gameId    String   @map("game_id")
-  game      Game     @relation(fields: [gameId], references: [id])
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id])
-  paymentId String?  @unique @map("payment_id")
-  payment   Payment? @relation(fields: [paymentId], references: [id])
-  joinedAt  DateTime @default(now()) @map("joined_at")
+  id            String        @id @default(cuid())
+  gameId        String        @map("game_id")
+  game          Game          @relation(fields: [gameId], references: [id])
+  userId        String        @map("user_id")
+  user          User          @relation(fields: [userId], references: [id])
+  paymentId     String?       @unique @map("payment_id")
+  payment       Payment?      @relation(fields: [paymentId], references: [id])
+  paymentMethod PaymentMethod @default(YUKASSA) @map("payment_method")
+  confirmed     Boolean       @default(false)
+  joinedAt      DateTime      @default(now()) @map("joined_at")
 
   @@unique([gameId, userId])
   @@map("game_participants")
