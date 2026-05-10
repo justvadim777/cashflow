@@ -46,6 +46,15 @@ const EXTRA_POINT_FIELDS = [
   { key: "pointsStories", label: "Сторис (+5)" },
 ] as const;
 
+interface CashParticipant {
+  userId: string;
+  confirmed: boolean;
+  paymentMethod: string;
+  joinedAt: string;
+  user: { displayName: string; username: string | null };
+  game: { id: string; date: string; time: string };
+}
+
 interface RefundRequest {
   id: string;
   amount: number;
@@ -56,7 +65,7 @@ interface RefundRequest {
   game: { date: string; time: string };
 }
 
-type Tab = "results" | "analytics" | "games" | "refunds";
+type Tab = "results" | "analytics" | "games" | "refunds" | "cash";
 
 export default function AdminPage() {
   const { role } = useUserStore();
@@ -68,6 +77,7 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [analytics, setAnalytics] = useState<Record<string, unknown> | null>(null);
   const [refunds, setRefunds] = useState<RefundRequest[]>([]);
+  const [cashParticipants, setCashParticipants] = useState<CashParticipant[]>([]);
 
   // Создание игры
   const [newGame, setNewGame] = useState({
@@ -104,6 +114,9 @@ export default function AdminPage() {
         .catch(() => {});
       api<{ refunds: RefundRequest[] }>("/admin/refunds/all")
         .then((d) => setRefunds(d.refunds))
+        .catch(() => {});
+      api<{ participants: CashParticipant[] }>("/admin/cash-participants")
+        .then((d) => setCashParticipants(d.participants))
         .catch(() => {});
     }
   }, [isAdmin, isHost, isOwner]);
@@ -186,6 +199,16 @@ export default function AdminPage() {
             }`}
           >
             Аналитика
+          </button>
+        )}
+        {(isAdmin || isHost) && (
+          <button
+            onClick={() => setTab("cash")}
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
+              tab === "cash" ? "bg-accent text-white" : "text-text-secondary"
+            }`}
+          >
+            Наличные
           </button>
         )}
         {(isAdmin || isOwner) && (
@@ -385,6 +408,72 @@ export default function AdminPage() {
             Создать игру
           </Button>
         </Card>
+      )}
+
+      {/* Cash registrations tab */}
+      {tab === "cash" && (
+        <div className="space-y-3">
+          <h2 className="font-semibold text-lg">CASH-записи (ожидают подтверждения)</h2>
+          {cashParticipants.filter((p) => !p.confirmed).length === 0 && (
+            <Card className="text-center text-text-secondary py-6">Нет ожидающих записей</Card>
+          )}
+          {cashParticipants
+            .filter((p) => !p.confirmed)
+            .map((p) => (
+              <Card key={`${p.game.id}-${p.userId}`} className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold">{p.user.displayName}</p>
+                    {p.user.username && (
+                      <p className="text-text-secondary text-xs">@{p.user.username}</p>
+                    )}
+                    <p className="text-text-secondary text-xs">
+                      {new Date(p.game.date).toLocaleDateString("ru-RU")} {p.game.time}
+                    </p>
+                  </div>
+                  <p className="text-gold text-xs font-semibold">CASH</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={async () => {
+                      await api(`/games/${p.game.id}/confirm`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ userId: p.userId, action: "confirm" }),
+                      });
+                      setCashParticipants((prev) =>
+                        prev.map((x) =>
+                          x.userId === p.userId && x.game.id === p.game.id
+                            ? { ...x, confirmed: true }
+                            : x
+                        )
+                      );
+                    }}
+                  >
+                    Подтвердить
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-danger/20 text-danger"
+                    onClick={async () => {
+                      await api(`/games/${p.game.id}/confirm`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ userId: p.userId, action: "reject" }),
+                      });
+                      setCashParticipants((prev) =>
+                        prev.filter(
+                          (x) => !(x.userId === p.userId && x.game.id === p.game.id)
+                        )
+                      );
+                    }}
+                  >
+                    Отклонить
+                  </Button>
+                </div>
+              </Card>
+            ))}
+        </div>
       )}
 
       {/* Refunds tab */}

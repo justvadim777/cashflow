@@ -18,6 +18,9 @@ interface GameDetail {
   description: string | null;
   createdBy: { id: string; displayName: string };
   participants: {
+    userId: string;
+    confirmed: boolean;
+    paymentMethod: "YUKASSA" | "CASH";
     user: {
       id: string;
       displayName: string;
@@ -36,6 +39,7 @@ export default function GameDetailPage() {
   const [isParticipant, setIsParticipant] = useState(false);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [registering, setRegistering] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -54,7 +58,7 @@ export default function GameDetailPage() {
     load();
   }, [id, router]);
 
-  async function handlePay() {
+  async function handlePayOnline() {
     if (!game) return;
     setPaying(true);
     try {
@@ -71,6 +75,35 @@ export default function GameDetailPage() {
     setPaying(false);
   }
 
+  async function handleRegisterCash() {
+    if (!game) return;
+    setRegistering(true);
+    try {
+      await api(`/games/${game.id}/register`, { method: "POST" });
+      setIsParticipant(true);
+      setGame((prev) =>
+        prev ? { ...prev, playersCount: prev.playersCount + 1 } : prev
+      );
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка записи");
+    }
+    setRegistering(false);
+  }
+
+  async function handleCancel() {
+    if (!game) return;
+    if (!confirm("Отменить запись?")) return;
+    try {
+      await api(`/games/${game.id}/register`, { method: "DELETE" });
+      setIsParticipant(false);
+      setGame((prev) =>
+        prev ? { ...prev, playersCount: prev.playersCount - 1 } : prev
+      );
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   if (loading || !game) {
     return (
       <div className="flex justify-center py-12">
@@ -78,6 +111,10 @@ export default function GameDetailPage() {
       </div>
     );
   }
+
+  const myParticipant = game.participants.find((p) => p.userId !== undefined);
+  const isConfirmed = myParticipant?.confirmed ?? false;
+  const isCash = myParticipant?.paymentMethod === "CASH";
 
   return (
     <div className="space-y-4">
@@ -145,21 +182,56 @@ export default function GameDetailPage() {
         </div>
       </Card>
 
-      {/* Кнопка оплаты */}
+      {/* Кнопки действий */}
       {game.status === "OPEN" && !isParticipant && (
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={handlePay}
-          disabled={paying}
-        >
-          {paying ? "Оформление..." : "Записаться и оплатить"}
-        </Button>
+        <div className="space-y-2">
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={handlePayOnline}
+            disabled={paying}
+          >
+            {paying ? "Оформление..." : "Оплатить онлайн"}
+          </Button>
+          <Button
+            className="w-full bg-card border border-accent/30 text-accent"
+            size="lg"
+            onClick={handleRegisterCash}
+            disabled={registering}
+          >
+            {registering ? "Запись..." : "Записаться, оплачу на месте"}
+          </Button>
+          <p className="text-text-secondary text-xs text-center">
+            При оплате наличными запись ожидает подтверждения администратора
+          </p>
+        </div>
       )}
+
       {isParticipant && (
-        <Card className="text-center bg-success/10 border-success/30">
-          <p className="text-success font-semibold">Вы записаны на эту игру</p>
-        </Card>
+        <div className="space-y-2">
+          {isConfirmed ? (
+            <Card className="text-center bg-success/10 border-success/30">
+              <p className="text-success font-semibold">Вы записаны на эту игру</p>
+            </Card>
+          ) : isCash ? (
+            <Card className="text-center bg-gold/10 border-gold/30">
+              <p className="text-gold font-semibold">Запись ожидает подтверждения</p>
+              <p className="text-text-secondary text-xs mt-1">Администратор подтвердит вашу запись</p>
+            </Card>
+          ) : (
+            <Card className="text-center bg-accent/10 border-accent/30">
+              <p className="text-accent font-semibold">Ожидание оплаты...</p>
+            </Card>
+          )}
+          {!isConfirmed && isCash && (
+            <button
+              onClick={handleCancel}
+              className="w-full text-danger text-sm py-2 hover:underline"
+            >
+              Отменить запись
+            </button>
+          )}
+        </div>
       )}
 
       {/* Участники */}
@@ -189,9 +261,14 @@ export default function GameDetailPage() {
                   </p>
                 )}
               </div>
-              <p className="text-gold text-sm font-bold">
-                {p.user.totalPoints} б.
-              </p>
+              <div className="text-right">
+                <p className="text-gold text-sm font-bold">
+                  {p.user.totalPoints} б.
+                </p>
+                {!p.confirmed && (
+                  <p className="text-text-secondary text-xs">ожидание</p>
+                )}
+              </div>
             </Card>
           ))}
         </div>
