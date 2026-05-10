@@ -7,7 +7,7 @@
     "build": "doppler run -- next build",
     "start": "doppler run -- next start",
     "test": "vitest run",
-    "build:ci": "next build",
+    "build:ci": "next build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
     "lint": "eslint",
     "bot": "doppler run -- tsx scripts/bot-polling.ts",
     "bot:webhook": "doppler run -- tsx scripts/set-webhook.ts"
@@ -36,6 +36,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "playwright": "^1.59.1",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
