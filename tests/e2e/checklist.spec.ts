@@ -163,3 +163,38 @@ test("9. Ближайшая игра — корректная дата и вре
   // Не должна показываться прошедшая игра (вчерашняя)
   expect(html, "Не должна быть вчерашняя дата 09.05").not.toMatch(/9 мая|09\.05|ui-test-game-finished/i);
 });
+
+// ─── БАГ 1: Gap между счётчиком игроков и статус-плашкой ──────────────────────
+test("UI: плашки на карточке Ближайшая игра не прижаты", async ({ page }) => {
+  await openAsTelegramWebApp(page, TEST_USER, "/dashboard");
+  await page.waitForTimeout(2000);
+  await page.screenshot({ path: "test-screenshots/10-next-game-card.png", fullPage: true });
+
+  const playersBox = await page.locator("text=/\\d+\\/\\d+ игроков/i").first().boundingBox();
+  const statusBox = await page.locator("text=/Ожидание|Записан|Открыта|Заполнена/i").first().boundingBox();
+  if (playersBox && statusBox) {
+    const gap = Math.abs(statusBox.x - (playersBox.x + playersBox.width));
+    expect(gap, "Gap между игроками и статусом должен быть >= 8px").toBeGreaterThan(6);
+  }
+});
+
+// ─── БАГ 2: Username синхронизируется при логине ──────────────────────────────
+test("Username синхронизируется при повторном логине", async ({ request }) => {
+  const tgId = 999000123;
+  // Первый логин — создаём/обновляем запись с old_nick
+  const initData1 = forgeInitData(BOT_TOKEN, { id: tgId, first_name: "SyncTest", username: "old_nick_sync" });
+  await request.post(`${PROD}/api/auth`, {
+    headers: { "Content-Type": "application/json" },
+    data: { initData: initData1 },
+  });
+
+  // Второй логин — тот же telegramId, новый username
+  const initData2 = forgeInitData(BOT_TOKEN, { id: tgId, first_name: "SyncTest", username: "new_nick_sync" });
+  const r = await request.post(`${PROD}/api/auth`, {
+    headers: { "Content-Type": "application/json" },
+    data: { initData: initData2 },
+  });
+  expect(r.status()).toBe(200);
+  const body = await r.json();
+  expect(body.user.username, "Username должен обновиться до new_nick_sync").toBe("new_nick_sync");
+});

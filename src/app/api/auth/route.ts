@@ -61,6 +61,9 @@ export async function POST(req: NextRequest) {
     const updates: {
       role?: ReturnType<typeof getRoleByTelegramId>;
       referredById?: string;
+      username?: string | null;
+      displayName?: string;
+      avatarUrl?: string | null;
     } = {};
 
     // Повысить роль если env-конфиг указывает на более высокую
@@ -80,6 +83,16 @@ export async function POST(req: NextRequest) {
         updates.referredById = referrer.id;
       }
     }
+
+    // Синхронизировать актуальные Telegram-данные
+    const freshDisplayName =
+      [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") || user.displayName;
+    const freshUsername = tgUser.username ?? null;
+    const freshAvatar = tgUser.photo_url ?? null;
+
+    if (user.username !== freshUsername) updates.username = freshUsername;
+    if (user.displayName !== freshDisplayName) updates.displayName = freshDisplayName;
+    if (freshAvatar && user.avatarUrl !== freshAvatar) updates.avatarUrl = freshAvatar;
 
     if (Object.keys(updates).length > 0) {
       user = await prisma.user.update({

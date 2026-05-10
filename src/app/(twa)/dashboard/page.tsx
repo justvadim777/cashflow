@@ -125,18 +125,18 @@ export default function DashboardPage() {
                 })}{" "}
                 в {nextGame.time}
               </p>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-text-secondary text-sm">
+              <div className="flex items-center justify-between gap-3 mt-2">
+                <p className="text-text-secondary text-sm shrink-0">
                   {nextGame.playersCount}/{nextGame.playersLimit} игроков
                 </p>
                 {nextGame.isParticipant ? (
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded shrink-0 ${
                     nextGame.isConfirmed ? "text-success bg-success/10" : "text-gold bg-gold/10"
                   }`}>
                     {nextGame.isConfirmed ? "Записан" : "Ожидание"}
                   </span>
                 ) : (
-                  <span className="text-gold text-sm font-bold">
+                  <span className="text-gold text-sm font-bold shrink-0">
                     {(nextGame.price / 100).toLocaleString("ru-RU")} ₽
                   </span>
                 )}
