@@ -82,14 +82,15 @@ model User {
 
   createdAt      DateTime @default(now()) @map("created_at")
 
-  participations GameParticipant[]
-  payments       Payment[]
-  gameResults    GameResult[]
-  referralsMade  Referral[]          @relation("ReferralsMade")
-  referralsReceived Referral[]       @relation("ReferralsReceived")
-  withdrawals    WithdrawalRequest[]
-  achievements   Achievement[]
-  createdGames   Game[]
+  participations  GameParticipant[]
+  payments        Payment[]
+  gameResults     GameResult[]
+  referralsMade   Referral[]          @relation("ReferralsMade")
+  referralsReceived Referral[]        @relation("ReferralsReceived")
+  withdrawals     WithdrawalRequest[]
+  achievements    Achievement[]
+  createdGames    Game[]
+  refundRequests  RefundRequest[]
 
   @@map("users")
 }
@@ -109,10 +110,11 @@ model Game {
   createdBy    User       @relation(fields: [createdById], references: [id])
   createdAt    DateTime   @default(now()) @map("created_at")
 
-  participants GameParticipant[]
-  payments     Payment[]
-  results      GameResult[]
-  referrals    Referral[]
+  participants   GameParticipant[]
+  payments       Payment[]
+  results        GameResult[]
+  referrals      Referral[]
+  refundRequests RefundRequest[]
 
   @@map("games")
 }
@@ -144,7 +146,8 @@ model Payment {
   providerPaymentId String?       @map("provider_payment_id")
   createdAt         DateTime      @default(now()) @map("created_at")
 
-  participant       GameParticipant?
+  participant    GameParticipant?
+  refundRequests RefundRequest[]
 
   @@map("payments")
 }
@@ -223,4 +226,21 @@ model Achievement {
 
   @@unique([userId, type])
   @@map("achievements")
+}
+
+model RefundRequest {
+  id          String           @id @default(cuid())
+  userId      String           @map("user_id")
+  user        User             @relation(fields: [userId], references: [id])
+  gameId      String           @map("game_id")
+  game        Game             @relation(fields: [gameId], references: [id])
+  paymentId   String           @map("payment_id")
+  payment     Payment          @relation(fields: [paymentId], references: [id])
+  amount      Int
+  reason      String?
+  status      WithdrawalStatus @default(CREATED)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  processedAt DateTime?        @map("processed_at")
+
+  @@map("refund_requests")
 }
