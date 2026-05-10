@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { sendNotification } from "@/lib/notifications/bot";
 
 // POST /api/payments/webhook — ЮКасса webhook
 export async function POST(req: NextRequest) {
@@ -37,40 +38,50 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  let referrerId: string | null = null;
+  let referralAmount = 0;
+
   await prisma.$transaction(async (tx) => {
-    // Обновить статус платежа
     await tx.payment.update({
       where: { id: paymentId },
       data: { status: "SUCCESS", providerPaymentId: event.object.id },
     });
 
-    // Добавить участника в игру
-    const participant = await tx.gameParticipant.create({
-      data: {
-        gameId,
-        userId,
-        paymentId,
-      },
+    // Участник мог быть создан при нажатии «Оплатить онлайн» — обновляем, иначе создаём
+    const existingParticipant = await tx.gameParticipant.findUnique({
+      where: { gameId_userId: { gameId, userId } },
     });
 
-    // Увеличить счётчик игроков
-    const game = await tx.game.update({
-      where: { id: gameId },
-      data: { playersCount: { increment: 1 } },
-    });
+    if (!existingParticipant) {
+      await tx.gameParticipant.create({
+        data: {
+          gameId,
+          userId,
+          paymentId,
+          paymentMethod: "YUKASSA",
+          confirmed: true,
+        },
+      });
 
-    // Если игра заполнена — сменить статус
-    if (game.playersCount >= game.playersLimit) {
-      await tx.game.update({
+      const game = await tx.game.update({
         where: { id: gameId },
-        data: { status: "FULL" },
+        data: { playersCount: { increment: 1 } },
+      });
+      if (game.playersCount >= game.playersLimit) {
+        await tx.game.update({ where: { id: gameId }, data: { status: "FULL" } });
+      }
+    } else {
+      await tx.gameParticipant.update({
+        where: { gameId_userId: { gameId, userId } },
+        data: { paymentId, paymentMethod: "YUKASSA", confirmed: true },
       });
     }
 
-    // Реферальное начисление (15%)
+    // Реферальное начисление (15%) — только здесь для YUKASSA
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (user?.referredById) {
-      const referralAmount = Math.round(payment.amount * 0.15);
+      referrerId = user.referredById;
+      referralAmount = Math.round(payment.amount * 0.15);
       await tx.referral.create({
         data: {
           referrerId: user.referredById,
@@ -86,6 +97,15 @@ export async function POST(req: NextRequest) {
       });
     }
   });
+
+  // Уведомить реферёра вне транзакции
+  if (referrerId && referralAmount > 0) {
+    const referrer = await prisma.user.findUnique({ where: { id: referrerId } });
+    if (referrer) {
+      const rubles = (referralAmount / 100).toLocaleString("ru-RU");
+      await sendNotification(referrer.telegramId, `Тебе начислено ${rubles} ₽ по реферальной системе`);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }
