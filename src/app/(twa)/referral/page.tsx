@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import Image from "next/image";
 
 interface ReferralEntry {
   id: string;
@@ -55,10 +56,24 @@ export default function ReferralPage() {
     }
   }
 
+  async function handleCoupon() {
+    if (!data || data.balance <= 0) return;
+    try {
+      const res = await api<{ couponCode: string; message: string }>("/referral/coupon", {
+        method: "POST",
+        body: JSON.stringify({ amount: data.balance }),
+      });
+      alert(res.message);
+      setData({ ...data, balance: 0 });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка");
+    }
+  }
+
   function copyLink() {
     if (!data) return;
     navigator.clipboard.writeText(
-      `https://t.me/BOT?start=ref_${data.referralCode}`
+      `https://t.me/denezhnyjpotok_bot?start=ref_${data.referralCode}`
     );
   }
 
@@ -107,10 +122,27 @@ export default function ReferralPage() {
             </p>
           </div>
         </div>
-        {data.balance > 0 && (
-          <Button className="w-full mt-4" onClick={handleWithdraw}>
-            Вывести средства
+        <div className="flex gap-3 mt-4">
+          <Button
+            className="flex-1"
+            onClick={handleWithdraw}
+            disabled={data.balance <= 0}
+          >
+            Вывести
           </Button>
+          <Button
+            className="flex-1"
+            variant="secondary"
+            onClick={handleCoupon}
+            disabled={data.balance <= 0}
+          >
+            Купон
+          </Button>
+        </div>
+        {data.balance <= 0 && (
+          <p className="text-text-secondary text-xs text-center mt-2">
+            Пригласи друга, чтобы получить баланс
+          </p>
         )}
       </Card>
 
@@ -119,7 +151,7 @@ export default function ReferralPage() {
         <p className="text-text-secondary text-sm mb-2">Твоя реферальная ссылка</p>
         <div className="flex items-center gap-2">
           <code className="flex-1 bg-bg rounded-lg px-3 py-2 text-sm text-accent truncate">
-            t.me/BOT?start=ref_{data.referralCode}
+            t.me/denezhnyjpotok_bot?start=ref_{data.referralCode}
           </code>
           <Button size="sm" onClick={copyLink}>
             Скопировать
@@ -134,7 +166,8 @@ export default function ReferralPage() {
         </h2>
         {data.referrals.length === 0 ? (
           <Card className="text-center py-6">
-            <p className="text-text-secondary">Пока нет рефералов</p>
+            <p className="text-text-secondary text-sm">Пока никого не пригласил</p>
+            <p className="text-text-secondary text-xs mt-1">Поделись ссылкой выше</p>
           </Card>
         ) : (
           <div className="space-y-2">
@@ -142,10 +175,11 @@ export default function ReferralPage() {
               <Card key={ref.id} className="flex items-center gap-3 py-3">
                 <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center text-sm font-bold shrink-0 relative">
                   {ref.avatarUrl ? (
-                    <img
+                    <Image
                       src={ref.avatarUrl}
                       alt=""
-                      className="w-full h-full rounded-full object-cover"
+                      fill
+                      className="rounded-full object-cover"
                     />
                   ) : (
                     ref.displayName[0]

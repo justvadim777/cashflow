@@ -4,10 +4,10 @@ import { sendNotification } from "@/lib/notifications/bot";
 import { isYukassaIp } from "@/lib/payments/yukassa-ips";
 import { verifyWebhookSignature, refundPayment } from "@/lib/payments/yukassa";
 import { tryIncrementPlayers } from "@/lib/games/atomic-join";
+import { checkGameAchievements, checkReferralAchievement } from "@/lib/achievements/check";
 
 // POST /api/payments/webhook — ЮКасса webhook
 export async function POST(req: NextRequest) {
-  // IP whitelist (только в production)
   if (process.env.NODE_ENV === "production") {
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -20,7 +20,6 @@ export async function POST(req: NextRequest) {
 
   const body = await req.text();
 
-  // Проверка HMAC-подписи (если задана)
   const signature = req.headers.get("Signature") ?? "";
   if (process.env.YUKASSA_WEBHOOK_SECRET && !verifyWebhookSignature(body, signature)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
@@ -53,22 +52,18 @@ export async function POST(req: NextRequest) {
 
   const { paymentId, userId, gameId } = metadata;
 
-  // Идемпотентность: проверяем что платёж ещё PENDING
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
   if (!payment || payment.status !== "PENDING") {
     return NextResponse.json({ ok: true });
   }
 
-  // Проверяем, есть ли уже участник (предварительная регистрация через «Оплатить онлайн»)
   const existingParticipant = await prisma.gameParticipant.findUnique({
     where: { gameId_userId: { gameId, userId } },
   });
 
   if (!existingParticipant) {
-    // Атомарно захватываем место
     const captured = await tryIncrementPlayers(gameId);
     if (!captured) {
-      // Игра заполнена — автовозврат через ЮКассу
       await prisma.payment.update({
         where: { id: paymentId },
         data: { status: "FAILED", providerPaymentId: event.object.id },
@@ -108,7 +103,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Реферальное начисление (15%) — только здесь для YUKASSA
+    // Реферальное начисление (15%) только для YUKASSA
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (user?.referredById) {
       referrerId = user.referredById;
@@ -134,9 +129,16 @@ export async function POST(req: NextRequest) {
     const referrer = await prisma.user.findUnique({ where: { id: referrerId } });
     if (referrer) {
       const rubles = (referralAmount / 100).toLocaleString("ru-RU");
-      await sendNotification(referrer.telegramId, `Тебе начислено ${rubles} ₽ по реферальной системе`);
+      await sendNotification(
+        referrer.telegramId,
+        `🤝 <b>Реферальный бонус!</b>\n\nТебе начислено <b>${rubles} ₽</b>`
+      );
+      await checkReferralAchievement(referrer.id);
     }
   }
+
+  // Проверить достижения
+  await checkGameAchievements(userId);
 
   return NextResponse.json({ ok: true });
 }

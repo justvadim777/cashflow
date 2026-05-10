@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
+import { autoFinishGames } from "@/lib/games/auto-finish";
 import type { GameType } from "@/generated/prisma/client";
 
 // GET /api/games — список игр
 export async function GET(req: NextRequest) {
   return withAuth(req, async (_req, { user }) => {
+    await autoFinishGames();
     const url = new URL(_req.url);
     const type = url.searchParams.get("type") as GameType | null;
     const status = url.searchParams.get("status");
@@ -25,7 +27,6 @@ export async function GET(req: NextRequest) {
               },
             },
           },
-          _count: { select: { participants: true } },
         },
         orderBy: { date: "asc" },
       }),
@@ -39,13 +40,14 @@ export async function GET(req: NextRequest) {
     ]);
 
     const topIds = new Set(topMonthly.map((u) => u.id));
+    const topPlayerIds = topMonthly.map((u) => u.id);
 
     const serialized = games.map((game) => ({
       ...game,
       hasTopPlayer: game.participants.some((p) => topIds.has(p.userId)),
     }));
 
-    return NextResponse.json({ games: serialized, userId: user.id });
+    return NextResponse.json({ games: serialized, userId: user.id, topPlayerIds });
   });
 }
 

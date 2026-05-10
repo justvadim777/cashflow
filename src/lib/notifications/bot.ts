@@ -1,4 +1,6 @@
 import { Bot, InlineKeyboard } from "grammy";
+import { prisma } from "@/lib/db";
+import crypto from "crypto";
 
 let bot: Bot | null = null;
 
@@ -19,6 +21,50 @@ function registerHandlers(bot: Bot) {
   bot.command("start", async (ctx) => {
     const startParam = ctx.match; // ref_XXXXXXXX
     const name = ctx.from?.first_name || "Игрок";
+    const telegramId = BigInt(ctx.from?.id || 0);
+
+    // Если пользователя нет — создать с реферальной привязкой
+    let existingUser = await prisma.user.findUnique({ where: { telegramId } });
+
+    if (!existingUser && telegramId > 0) {
+      const displayName = [ctx.from?.first_name, ctx.from?.last_name]
+        .filter(Boolean)
+        .join(" ") || "Игрок";
+      const referralCode = crypto.randomBytes(4).toString("hex");
+
+      let referredById: string | undefined;
+      if (startParam?.startsWith("ref_")) {
+        const code = startParam.replace("ref_", "");
+        const referrer = await prisma.user.findUnique({
+          where: { referralCode: code },
+        });
+        if (referrer) {
+          referredById = referrer.id;
+        }
+      }
+
+      existingUser = await prisma.user.create({
+        data: {
+          telegramId,
+          username: ctx.from?.username || null,
+          displayName,
+          referralCode,
+          referredById,
+        },
+      });
+    } else if (existingUser && !existingUser.referredById && startParam?.startsWith("ref_")) {
+      // Пользователь есть, но реферал ещё не привязан
+      const code = startParam.replace("ref_", "");
+      const referrer = await prisma.user.findUnique({
+        where: { referralCode: code },
+      });
+      if (referrer && referrer.id !== existingUser.id) {
+        await prisma.user.update({
+          where: { id: existingUser.id },
+          data: { referredById: referrer.id },
+        });
+      }
+    }
 
     let text = `Привет, <b>${name}</b>! 👋\n\n`;
     text += `Добро пожаловать в <b>Cashflow</b> — систему записи и рейтинга игр «Денежный поток» в Остров Lounge.\n\n`;

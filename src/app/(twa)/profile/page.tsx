@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 import Link from "next/link";
+import Image from "next/image";
 
 const LEVEL_LABELS: Record<string, string> = {
   NEWBIE: "Новичок",
@@ -30,46 +31,47 @@ interface Achievement {
   earnedAt: string;
 }
 
-interface PointEvent {
-  id: string;
-  totalPoints: number;
-  gameId: string;
-  game?: { date: string; type: string };
-}
-
 export default function ProfilePage() {
   const user = useUserStore();
   const [tab, setTab] = useState<Tab>("achievements");
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [recentResults, setRecentResults] = useState<PointEvent[]>([]);
 
   useEffect(() => {
-    // TODO: Load achievements and recent results from API
+    async function loadProfile() {
+      try {
+        const data = await api<{ achievements: Achievement[] }>("/profile/achievements");
+        setAchievements(data.achievements);
+      } catch {
+        // achievements загрузятся при следующем визите
+      }
+    }
+    loadProfile();
   }, []);
 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-text-secondary text-sm">Позиция в рейтинге</p>
-          <p className="text-3xl font-bold">—</p>
+      <div className="flex gap-3">
+        <div className="flex-1 bg-card rounded-xl px-3 py-2 text-center">
+          <p className="text-text-secondary text-xs">За всё время</p>
+          <p className="text-2xl font-bold text-gold">{user.totalPoints}</p>
         </div>
-        <div className="text-right">
-          <p className="text-text-secondary text-sm">Баллы</p>
-          <p className="text-3xl font-bold text-gold">{user.totalPoints}</p>
+        <div className="flex-1 bg-card rounded-xl px-3 py-2 text-center">
+          <p className="text-text-secondary text-xs">За месяц</p>
+          <p className="text-2xl font-bold text-accent">{user.monthlyPoints}</p>
         </div>
       </div>
 
       {/* Avatar */}
       <div className="flex flex-col items-center">
         <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#7B2FBE] to-accent p-[3px]">
-          <div className="w-full h-full rounded-full bg-card flex items-center justify-center text-3xl font-bold">
+          <div className="w-full h-full rounded-full bg-card flex items-center justify-center text-3xl font-bold relative">
             {user.avatarUrl ? (
-              <img
+              <Image
                 src={user.avatarUrl}
                 alt=""
-                className="w-full h-full rounded-full object-cover"
+                fill
+                className="rounded-full object-cover"
               />
             ) : (
               user.displayName?.[0] || "?"
@@ -171,9 +173,21 @@ export default function ProfilePage() {
           {user.referralCode && (
             <div className="mt-3">
               <p className="text-text-secondary text-xs mb-1">Твоя ссылка</p>
-              <code className="block bg-bg rounded-lg px-3 py-2 text-xs text-accent break-all">
-                t.me/BOT?start=ref_{user.referralCode}
-              </code>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-bg rounded-lg px-3 py-2 text-xs text-accent break-all">
+                  t.me/denezhnyjpotok_bot?start=ref_{user.referralCode}
+                </code>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `https://t.me/denezhnyjpotok_bot?start=ref_${user.referralCode}`
+                    );
+                  }}
+                >
+                  Скопировать
+                </Button>
+              </div>
             </div>
           )}
         </Card>

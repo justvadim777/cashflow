@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
       .join(" ");
 
     const referralCode = crypto.randomBytes(4).toString("hex");
+    const role = getRoleByTelegramId(telegramId);
 
     let referredById: string | undefined;
     if (startParam?.startsWith("ref_")) {
@@ -43,8 +44,6 @@ export async function POST(req: NextRequest) {
         referredById = referrer.id;
       }
     }
-
-    const role = getRoleByTelegramId(telegramId);
 
     await audit("ROLE_CHANGE", telegramId, `new user ${telegramId}`, { role });
     user = await prisma.user.create({
@@ -59,13 +58,33 @@ export async function POST(req: NextRequest) {
       },
     });
   } else {
-    // Обновить роль если в .env она выше текущей
+    const updates: {
+      role?: ReturnType<typeof getRoleByTelegramId>;
+      referredById?: string;
+    } = {};
+
+    // Повысить роль если env-конфиг указывает на более высокую
     const envRole = getRoleByTelegramId(telegramId);
     const roleOrder: Record<string, number> = { PLAYER: 0, HOST: 1, ADMIN: 2, OWNER: 3 };
     if (roleOrder[envRole] > roleOrder[user.role]) {
+      updates.role = envRole;
+    }
+
+    // Привязать реферала если ещё не привязан и есть startParam
+    if (!user.referredById && startParam?.startsWith("ref_")) {
+      const code = startParam.replace("ref_", "");
+      const referrer = await prisma.user.findUnique({
+        where: { referralCode: code },
+      });
+      if (referrer && referrer.id !== user.id) {
+        updates.referredById = referrer.id;
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
       user = await prisma.user.update({
-        where: { id: user.id },
-        data: { role: envRole },
+        where: { telegramId },
+        data: updates,
       });
     }
   }

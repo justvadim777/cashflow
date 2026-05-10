@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { calculateTotalPoints, recalcUserStatsAfterResult, getLevelName } from "@/lib/points/calculate";
 import type { ResultInput } from "@/lib/points/calculate";
 import { checkGameAchievements } from "@/lib/achievements/check";
-import { sendNotification } from "@/lib/notifications/bot";
+import { sendNotification, sendNotificationWithButton } from "@/lib/notifications/bot";
 import { NOTIFICATION_TEMPLATES } from "@/lib/notifications/templates";
 import { audit } from "@/lib/audit";
 
@@ -60,28 +60,26 @@ export async function POST(req: NextRequest) {
     };
 
     const totalPoints = calculateTotalPoints(resultInput);
+    const hookahRevenue = scores.hookahRevenue || 0;
 
     await audit("GAME_RESULT_SAVE", user.telegramId, `game:${gameId} user:${userId}`, { totalPoints });
 
     const result = await prisma.gameResult.upsert({
       where: { gameId_userId: { gameId, userId } },
-      create: { gameId, userId, ...resultInput, totalPoints },
-      update: { ...resultInput, totalPoints },
+      create: { gameId, userId, ...resultInput, totalPoints, hookahRevenue },
+      update: { ...resultInput, totalPoints, hookahRevenue },
     });
 
-    // Пересчёт уровня и баллов
     const { totalPoints: userTotal, newLevel, levelUp } = await recalcUserStatsAfterResult(userId);
 
-    // Место в общем рейтинге
     const rank =
       (await prisma.user.count({ where: { totalPoints: { gt: userTotal } } })) + 1;
 
-    // Пуш игроку с результатом
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (targetUser) {
       await sendNotification(
         targetUser.telegramId,
-        NOTIFICATION_TEMPLATES.GAME_RESULT(totalPoints, rank)
+        NOTIFICATION_TEMPLATES.GAME_RESULT(totalPoints, rank, getLevelName(newLevel))
       );
 
       if (levelUp) {
@@ -92,7 +90,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Проверка достижений
+    // Upsell: после первой BASE игры → предложить MAIN
+    const game = await prisma.game.findUnique({ where: { id: gameId } });
+    if (game?.type === "BASE" && targetUser) {
+      const baseGamesCount = await prisma.gameResult.count({
+        where: { userId, game: { type: "BASE" } },
+      });
+      if (baseGamesCount === 1) {
+        const appUrl = process.env.NEXT_PUBLIC_TG_APP_URL || "";
+        await sendNotificationWithButton(
+          targetUser.telegramId,
+          NOTIFICATION_TEMPLATES.UPSELL_MAIN(),
+          "Записаться в Продвинутую",
+          `${appUrl}/games`
+        );
+      }
+    }
+
     const newAchievements = await checkGameAchievements(userId);
 
     return NextResponse.json({ result, userTotalPoints: userTotal, newLevel, rank, newAchievements });

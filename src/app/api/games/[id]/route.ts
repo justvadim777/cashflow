@@ -14,7 +14,10 @@ export async function GET(
       where: { id },
       include: {
         participants: {
-          include: {
+          select: {
+            id: true,
+            confirmed: true,
+            userId: true,
             user: {
               select: {
                 id: true,
@@ -27,7 +30,12 @@ export async function GET(
           },
         },
         results: {
-          where: { userId: user.id },
+          select: {
+            totalPoints: true,
+            userId: true,
+            user: { select: { displayName: true } },
+          },
+          orderBy: { totalPoints: "desc" },
         },
         createdBy: {
           select: { id: true, displayName: true },

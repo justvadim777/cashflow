@@ -131,7 +131,7 @@ model GameParticipant {
   payment       Payment?      @relation(fields: [paymentId], references: [id])
   paymentMethod    PaymentMethod @default(YUKASSA) @map("payment_method")
   confirmed        Boolean       @default(false)
-  manualPaidAmount Int?          @map("manual_paid_amount") // в копейках, для CASH-подтверждений
+  manualPaidAmount Int?          @map("manual_paid_amount")
   joinedAt         DateTime      @default(now()) @map("joined_at")
 
   @@unique([gameId, userId])
@@ -189,6 +189,9 @@ model GameResult {
   pointsStories      Int @default(0) @map("points_stories")
 
   totalPoints        Int @default(0) @map("total_points")
+
+  // Выручка кальянки (в копейках)
+  hookahRevenue      Int @default(0) @map("hookah_revenue")
 
   @@unique([gameId, userId])
   @@map("game_results")

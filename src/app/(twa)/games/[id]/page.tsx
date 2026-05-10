@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import Image from "next/image";
 
 interface GameDetail {
   id: string;
@@ -29,8 +30,13 @@ interface GameDetail {
       totalPoints: number;
     };
   }[];
-  results: { totalPoints: number }[];
+  results: { totalPoints: number; userId: string; user: { displayName: string } }[];
 }
+
+const TYPE_LABELS: Record<string, string> = {
+  BASE: "Базовая",
+  MAIN: "Продвинутая",
+};
 
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -62,19 +68,29 @@ export default function GameDetailPage() {
 
   async function handlePayOnline() {
     if (!game) return;
-    setPaying(true);
+    setRegistering(true);
     try {
-      const data = await api<{ paymentUrl: string }>("/payments", {
-        method: "POST",
-        body: JSON.stringify({ gameId: game.id }),
-      });
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      }
+      await api(`/games/${game.id}/register`, { method: "POST" });
+      setIsParticipant(true);
+      setGame({ ...game, playersCount: game.playersCount + 1 });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка оплаты");
+      alert(e instanceof Error ? e.message : "Ошибка записи");
     }
-    setPaying(false);
+    setRegistering(false);
+  }
+
+  async function handleCancel() {
+    if (!game) return;
+    if (!confirm("Точно отменить запись на игру?")) return;
+    setRegistering(true);
+    try {
+      await api(`/games/${game.id}/register`, { method: "DELETE" });
+      setIsParticipant(false);
+      setGame({ ...game, playersCount: Math.max(0, game.playersCount - 1) });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка отмены");
+    }
+    setRegistering(false);
   }
 
   async function handleRegisterCash() {
@@ -104,20 +120,6 @@ export default function GameDetailPage() {
     setJoiningWaitlist(false);
   }
 
-  async function handleCancel() {
-    if (!game) return;
-    if (!confirm("Отменить запись?")) return;
-    try {
-      await api(`/games/${game.id}/register`, { method: "DELETE" });
-      setIsParticipant(false);
-      setGame((prev) =>
-        prev ? { ...prev, playersCount: prev.playersCount - 1 } : prev
-      );
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
-    }
-  }
-
   if (loading || !game) {
     return (
       <div className="flex justify-center py-12">
@@ -132,13 +134,6 @@ export default function GameDetailPage() {
 
   return (
     <div className="space-y-4">
-      <button
-        onClick={() => router.back()}
-        className="text-text-secondary text-sm hover:text-white transition-colors"
-      >
-        &larr; Назад
-      </button>
-
       <div className="flex items-center gap-3">
         <span
           className={`px-3 py-1 rounded-lg text-sm font-bold ${
@@ -147,7 +142,7 @@ export default function GameDetailPage() {
               : "bg-accent/20 text-accent"
           }`}
         >
-          {game.type}
+          {TYPE_LABELS[game.type]}
         </span>
         <span
           className={`px-3 py-1 rounded-lg text-sm font-bold ${
@@ -276,12 +271,13 @@ export default function GameDetailPage() {
         <div className="space-y-2">
           {game.participants.map((p) => (
             <Card key={p.user.id} className="flex items-center gap-3 py-3">
-              <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center text-sm font-bold shrink-0">
+              <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center text-sm font-bold shrink-0 relative">
                 {p.user.avatarUrl ? (
-                  <img
+                  <Image
                     src={p.user.avatarUrl}
                     alt=""
-                    className="w-full h-full rounded-full object-cover"
+                    fill
+                    className="rounded-full object-cover"
                   />
                 ) : (
                   p.user.displayName[0]
@@ -308,14 +304,24 @@ export default function GameDetailPage() {
         </div>
       </div>
 
-      {/* Результат */}
+      {/* Результаты */}
       {game.results.length > 0 && (
-        <Card>
-          <p className="text-text-secondary text-sm">Ваш результат</p>
-          <p className="text-2xl font-bold text-gold">
-            {game.results[0].totalPoints} баллов
-          </p>
-        </Card>
+        <div>
+          <h2 className="text-lg font-bold mb-3">Результаты</h2>
+          <div className="space-y-2">
+            {game.results.map((r, i) => (
+              <Card key={r.userId} className="flex items-center gap-3 py-3">
+                <span className="w-6 text-center text-sm font-bold text-text-secondary">
+                  {i + 1}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{r.user.displayName}</p>
+                </div>
+                <p className="text-gold text-sm font-bold">{r.totalPoints} б.</p>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
 
       <p className="text-text-secondary text-xs text-center">

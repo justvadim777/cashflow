@@ -6,7 +6,6 @@ import { prisma } from "@/lib/db";
 export async function GET(req: NextRequest) {
   return withAuth(req, async (_req, { user }) => {
     const [allReferrals, referralEarnings] = await Promise.all([
-      // Все юзеры, пришедшие по ссылке (независимо от оплаты)
       prisma.user.findMany({
         where: { referredById: user.id },
         include: {
@@ -14,14 +13,12 @@ export async function GET(req: NextRequest) {
         },
         orderBy: { createdAt: "desc" },
       }),
-      // Суммы начислений от каждого реферала
       prisma.referral.findMany({
         where: { referrerId: user.id },
         select: { referredId: true, amount: true },
       }),
     ]);
 
-    // Индекс начислений по referredId
     const earningsByRef = new Map<string, number>();
     for (const r of referralEarnings) {
       earningsByRef.set(r.referredId, (earningsByRef.get(r.referredId) ?? 0) + r.amount);

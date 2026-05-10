@@ -14,6 +14,39 @@ export async function POST(req: NextRequest) {
   const now = new Date();
   const appUrl = process.env.NEXT_PUBLIC_TG_APP_URL || "";
 
+  // 0. Напоминание за 48ч НЕ записанным (есть места)
+  const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  const in48hStart = new Date(in48h.toDateString());
+  const in48hEnd = new Date(in48hStart.getTime() + 24 * 60 * 60 * 1000);
+
+  const gamesIn48h = await prisma.game.findMany({
+    where: {
+      date: { gte: in48hStart, lt: in48hEnd },
+      status: "OPEN",
+    },
+    include: { participants: { select: { userId: true } } },
+  });
+
+  if (gamesIn48h.length > 0) {
+    const participantUserIds = new Set(
+      gamesIn48h.flatMap((g) => g.participants.map((p) => p.userId))
+    );
+
+    const allUsers = await prisma.user.findMany({
+      where: { id: { notIn: Array.from(participantUserIds) } },
+      select: { telegramId: true },
+    });
+
+    for (const u of allUsers) {
+      await sendNotificationWithButton(
+        u.telegramId,
+        NOTIFICATION_TEMPLATES.REMINDER_48H_NOT_REGISTERED(),
+        "Записаться",
+        `${appUrl}/games`
+      );
+    }
+  }
+
   // 1. Напоминание за 24ч записанным
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const tomorrowStart = new Date(tomorrow.toDateString());

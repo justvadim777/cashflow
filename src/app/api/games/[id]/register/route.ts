@@ -3,8 +3,9 @@ import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
 import { tryIncrementPlayers, decrementPlayers } from "@/lib/games/atomic-join";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { sendNotification } from "@/lib/notifications/bot";
 
-// POST /api/games/[id]/register — CASH-запись (без онлайн-оплаты)
+// POST /api/games/[id]/register — запись на игру (CASH, без онлайн-оплаты)
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -17,22 +18,24 @@ export async function POST(
 
     const { id: gameId } = await params;
 
-    const game = await prisma.game.findUnique({ where: { id: gameId } });
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: { createdBy: { select: { telegramId: true } } },
+    });
     if (!game) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
     }
     if (game.status !== "OPEN") {
-      return NextResponse.json({ error: "Game is not open for registration" }, { status: 409 });
+      return NextResponse.json({ error: "Запись закрыта" }, { status: 400 });
     }
 
     const existing = await prisma.gameParticipant.findUnique({
       where: { gameId_userId: { gameId, userId: user.id } },
     });
     if (existing) {
-      return NextResponse.json({ error: "Already registered" }, { status: 409 });
+      return NextResponse.json({ error: "Вы уже записаны" }, { status: 400 });
     }
 
-    // Атомарно захватываем место
     const captured = await tryIncrementPlayers(gameId);
     if (!captured) {
       return NextResponse.json({ error: "Game is full" }, { status: 409 });
@@ -46,6 +49,26 @@ export async function POST(
         confirmed: false,
       },
     });
+
+    // Уведомление всем ADMIN/OWNER и ведущему игры
+    const gameDate = new Date(game.date).toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+    });
+    const userInfo = user.username ? `@${user.username}` : user.displayName;
+    const notifyText = `🆕 <b>Новая запись на игру</b>\n\n${user.displayName} (${userInfo}) записался на игру <b>${gameDate}</b> в <b>${game.time}</b>.\n\nОжидает подтверждения оплаты.`;
+
+    const admins = await prisma.user.findMany({
+      where: { role: { in: ["ADMIN", "OWNER"] } },
+      select: { telegramId: true },
+    });
+
+    const recipients = new Set<bigint>(admins.map((a) => a.telegramId));
+    recipients.add(game.createdBy.telegramId);
+
+    for (const tid of recipients) {
+      await sendNotification(tid, notifyText);
+    }
 
     return NextResponse.json({ participant }, { status: 201 });
   });
@@ -65,7 +88,7 @@ export async function DELETE(
     });
 
     if (!participant) {
-      return NextResponse.json({ error: "Not registered" }, { status: 404 });
+      return NextResponse.json({ error: "Вы не записаны" }, { status: 400 });
     }
 
     if (participant.confirmed || participant.payment?.status === "SUCCESS") {

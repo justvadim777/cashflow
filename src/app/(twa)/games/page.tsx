@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import Image from "next/image";
 import Link from "next/link";
 
 interface GameParticipant {
@@ -28,10 +28,16 @@ interface Game {
   participants: GameParticipant[];
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  BASE: "Базовая",
+  MAIN: "Продвинутая",
+};
+
 type TabFilter = "active" | "finished";
 
 export default function GamesPage() {
   const [games, setGames] = useState<Game[]>([]);
+  const [topPlayerIds, setTopPlayerIds] = useState<string[]>([]);
   const [tab, setTab] = useState<TabFilter>("active");
   const [typeFilter, setTypeFilter] = useState<"" | "BASE" | "MAIN">("");
   const [loading, setLoading] = useState(true);
@@ -42,8 +48,9 @@ export default function GamesPage() {
       try {
         const params = new URLSearchParams({ status: tab });
         if (typeFilter) params.set("type", typeFilter);
-        const data = await api<{ games: Game[] }>(`/games?${params}`);
+        const data = await api<{ games: Game[]; topPlayerIds: string[] }>(`/games?${params}`);
         setGames(data.games);
+        setTopPlayerIds(data.topPlayerIds || []);
       } catch {
         setGames([]);
       }
@@ -85,7 +92,7 @@ export default function GamesPage() {
                 : "text-text-secondary hover:text-white"
             }`}
           >
-            {t === "" ? "Все" : t}
+            {t === "" ? "Все" : TYPE_LABELS[t]}
           </button>
         ))}
       </div>
@@ -103,7 +110,10 @@ export default function GamesPage() {
         <div className="space-y-3">
           {games.map((game) => {
             const spotsLeft = game.playersLimit - game.playersCount;
-            const lowSpots = spotsLeft > 0 && spotsLeft <= game.playersLimit * 0.5;
+            const lowSpots = spotsLeft > 0 && spotsLeft <= 2 && game.status === "OPEN";
+            const hasTopPlayer = game.participants.some((p) =>
+              topPlayerIds.includes(p.user.id)
+            );
 
             return (
               <Link key={game.id} href={`/games/${game.id}`}>
@@ -118,7 +128,7 @@ export default function GamesPage() {
                               : "bg-accent/20 text-accent"
                           }`}
                         >
-                          {game.type}
+                          {TYPE_LABELS[game.type]}
                         </span>
                         {game.status === "FULL" && (
                           <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-danger/20 text-danger">
@@ -150,14 +160,15 @@ export default function GamesPage() {
                       {game.participants.slice(0, 5).map((p) => (
                         <div
                           key={p.user.id}
-                          className="w-8 h-8 rounded-full bg-accent/30 border-2 border-card flex items-center justify-center text-xs font-bold"
+                          className="w-8 h-8 rounded-full bg-accent/30 border-2 border-card flex items-center justify-center text-xs font-bold relative"
                           title={p.user.displayName}
                         >
                           {p.user.avatarUrl ? (
-                            <img
+                            <Image
                               src={p.user.avatarUrl}
                               alt=""
-                              className="w-full h-full rounded-full object-cover"
+                              fill
+                              className="rounded-full object-cover"
                             />
                           ) : (
                             p.user.displayName[0]

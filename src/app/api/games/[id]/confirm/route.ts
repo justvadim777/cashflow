@@ -4,8 +4,9 @@ import { prisma } from "@/lib/db";
 import { sendNotification } from "@/lib/notifications/bot";
 import { decrementPlayers } from "@/lib/games/atomic-join";
 import { audit } from "@/lib/audit";
+import { checkReferralAchievement } from "@/lib/achievements/check";
 
-// PATCH /api/games/[id]/confirm — подтверждение/отклонение записи (ADMIN)
+// PATCH /api/games/[id]/confirm — подтверждение/отклонение записи (ADMIN/HOST)
 // body: { userId: string, action: "confirm" | "reject" }
 export async function PATCH(
   req: NextRequest,
@@ -30,7 +31,7 @@ export async function PATCH(
 
     const participant = await prisma.gameParticipant.findUnique({
       where: { gameId_userId: { gameId, userId } },
-      include: { user: true, payment: true },
+      include: { user: true, payment: true, game: true },
     });
 
     if (!participant) {
@@ -44,7 +45,6 @@ export async function PATCH(
     );
 
     if (action === "confirm") {
-      // manualPaidAmount: если CASH и передан amount (в рублях) → сохраняем в копейках
       const manualPaidAmount =
         participant.paymentMethod === "CASH" && amount != null
           ? Math.round(amount * 100)
@@ -55,9 +55,10 @@ export async function PATCH(
         data: { confirmed: true, ...(manualPaidAmount != null ? { manualPaidAmount } : {}) },
       });
 
-      // Реферальный бонус только для CASH-оплаты
+      // Реферальный бонус для CASH-оплаты (YUKASSA обрабатывается в webhook)
       if (participant.paymentMethod === "CASH" && participant.user.referredById) {
-        const referralAmount = Math.round((participant.payment?.amount ?? 0) * 0.15);
+        const gamePrice = participant.game.price;
+        const referralAmount = Math.round(gamePrice * 0.15);
         if (referralAmount > 0) {
           await prisma.$transaction(async (tx) => {
             await tx.referral.create({
@@ -80,14 +81,23 @@ export async function PATCH(
           });
           if (referrer) {
             const rubles = (referralAmount / 100).toLocaleString("ru-RU");
-            await sendNotification(referrer.telegramId, `Тебе начислено ${rubles} ₽ по реферальной системе`);
+            await sendNotification(
+              referrer.telegramId,
+              `🤝 <b>Реферальный бонус!</b>\n\nТебе начислено <b>${rubles} ₽</b> за реферала ${participant.user.displayName}.`
+            );
+            await checkReferralAchievement(referrer.id);
           }
         }
       }
 
+      const gameDate = new Date(participant.game.date).toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "long",
+      });
+
       await sendNotification(
         participant.user.telegramId,
-        `Твоя запись на игру подтверждена. Ждём тебя в Остров Lounge!`
+        `✅ <b>Оплата подтверждена!</b>\n\nТы в списке игроков на игру <b>${gameDate}</b> в <b>${participant.game.time}</b>.\n\nЖдём в Остров Lounge!`
       );
     } else if (action === "reject") {
       await prisma.gameParticipant.delete({
@@ -97,7 +107,7 @@ export async function PATCH(
 
       await sendNotification(
         participant.user.telegramId,
-        `Твоя запись на игру отклонена администратором.`
+        `❌ <b>Запись отклонена</b>\n\nТвоя запись на игру была отклонена. Свяжись с организатором для уточнения.`
       );
     }
 
