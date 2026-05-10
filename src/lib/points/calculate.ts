@@ -1,4 +1,5 @@
 import type { UserLevel } from "@/generated/prisma/client";
+import { prisma } from "@/lib/db";
 
 interface SkillScores {
   skillFinance: number;
@@ -66,4 +67,60 @@ export function calculateLevel(totalPoints: number): UserLevel {
   if (totalPoints >= 501) return "INVESTOR";
   if (totalPoints >= 151) return "PLAYER";
   return "NEWBIE";
+}
+
+const LEVEL_NAMES: Record<UserLevel, string> = {
+  NEWBIE: "Новичок",
+  PLAYER: "Игрок",
+  INVESTOR: "Инвестор",
+  CAPITALIST: "Капиталист",
+};
+
+export function getLevelName(level: UserLevel): string {
+  return LEVEL_NAMES[level];
+}
+
+export async function recalcUserStatsAfterResult(userId: string): Promise<{
+  totalPoints: number;
+  monthlyPoints: number;
+  newLevel: UserLevel;
+  levelUp: boolean;
+}> {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+
+  const allResults = await prisma.gameResult.findMany({
+    where: { userId },
+    select: { totalPoints: true, id: true },
+  });
+  const totalPoints = allResults.reduce((s, r) => s + r.totalPoints, 0);
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const monthlyResults = await prisma.gameResult.findMany({
+    where: { userId, game: { date: { gte: startOfMonth } } },
+    select: { totalPoints: true },
+  });
+  const monthlyPoints = monthlyResults.reduce((s, r) => s + r.totalPoints, 0);
+
+  const newLevel = calculateLevel(totalPoints);
+  const levelUp = newLevel !== user.level;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { totalPoints, monthlyPoints, level: newLevel },
+  });
+
+  if (levelUp) {
+    await prisma.notificationLog.upsert({
+      where: { userId_gameId_type: { userId, gameId: "system", type: "LEVEL_UP" } },
+      create: { userId, gameId: "system", type: "LEVEL_UP" },
+      update: { sentAt: new Date() },
+    }).catch(() => {
+      // ignore unique constraint — create separately
+    });
+  }
+
+  return { totalPoints, monthlyPoints, newLevel, levelUp };
 }
