@@ -24,6 +24,7 @@ interface Game {
   playersCount: number;
   status: "OPEN" | "FULL" | "FINISHED";
   description: string | null;
+  hasTopPlayer: boolean;
   participants: GameParticipant[];
 }
 
@@ -109,7 +110,7 @@ export default function GamesPage() {
                 <Card className="hover:border-accent/30 transition-colors">
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className={`px-2 py-0.5 rounded-md text-xs font-bold ${
                             game.type === "MAIN"
@@ -122,11 +123,6 @@ export default function GamesPage() {
                         {game.status === "FULL" && (
                           <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-danger/20 text-danger">
                             Мест нет
-                          </span>
-                        )}
-                        {lowSpots && game.status === "OPEN" && (
-                          <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-gold/20 text-gold">
-                            Мало мест
                           </span>
                         )}
                       </div>
@@ -172,6 +168,22 @@ export default function GamesPage() {
                         <div className="w-8 h-8 rounded-full bg-card border-2 border-border flex items-center justify-center text-xs text-text-secondary">
                           +{game.participants.length - 5}
                         </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Нижние плашки — задачи 1 и 2 */}
+                  {(lowSpots || game.hasTopPlayer) && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {lowSpots && game.status === "OPEN" && (
+                        <span className="px-3 py-1 rounded-lg text-xs font-bold border bg-rose-500/15 border-rose-500/40 text-rose-300 w-full text-center">
+                          Осталось мало мест
+                        </span>
+                      )}
+                      {game.hasTopPlayer && (
+                        <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-gold/10 border border-gold/30 text-gold w-full text-center">
+                          В игре участвуют топовые игроки 🔥
+                        </span>
                       )}
                     </div>
                   )}

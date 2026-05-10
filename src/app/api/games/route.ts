@@ -10,28 +10,39 @@ export async function GET(req: NextRequest) {
     const type = url.searchParams.get("type") as GameType | null;
     const status = url.searchParams.get("status");
 
-    const games = await prisma.game.findMany({
-      where: {
-        ...(type ? { type } : {}),
-        ...(status === "active" ? { status: { in: ["OPEN", "FULL"] } } : {}),
-        ...(status === "finished" ? { status: "FINISHED" } : {}),
-      },
-      include: {
-        participants: {
-          include: {
-            user: {
-              select: { id: true, displayName: true, avatarUrl: true, username: true },
+    const [games, topMonthly] = await Promise.all([
+      prisma.game.findMany({
+        where: {
+          ...(type ? { type } : {}),
+          ...(status === "active" ? { status: { in: ["OPEN", "FULL"] } } : {}),
+          ...(status === "finished" ? { status: "FINISHED" } : {}),
+        },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: { id: true, displayName: true, avatarUrl: true, username: true },
+              },
             },
           },
+          _count: { select: { participants: true } },
         },
-        _count: { select: { participants: true } },
-      },
-      orderBy: { date: "asc" },
-    });
+        orderBy: { date: "asc" },
+      }),
+      // Топ-5 по monthly_points для флага «топовые игроки»
+      prisma.user.findMany({
+        where: { monthlyPoints: { gt: 0 } },
+        orderBy: { monthlyPoints: "desc" },
+        take: 5,
+        select: { id: true },
+      }),
+    ]);
 
-    const serialized = games.map((game: { price: number } & Record<string, unknown>) => ({
+    const topIds = new Set(topMonthly.map((u) => u.id));
+
+    const serialized = games.map((game) => ({
       ...game,
-      price: game.price,
+      hasTopPlayer: game.participants.some((p) => topIds.has(p.userId)),
     }));
 
     return NextResponse.json({ games: serialized, userId: user.id });
