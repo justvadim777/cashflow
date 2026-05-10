@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { sendNotification } from "@/lib/notifications/bot";
 import { isYukassaIp } from "@/lib/payments/yukassa-ips";
 import { verifyWebhookSignature } from "@/lib/payments/yukassa";
+import { tryIncrementPlayers } from "@/lib/games/atomic-join";
 
 // POST /api/payments/webhook — ЮКасса webhook
 export async function POST(req: NextRequest) {
@@ -58,6 +59,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // Проверяем, есть ли уже участник (предварительная регистрация через «Оплатить онлайн»)
+  const existingParticipant = await prisma.gameParticipant.findUnique({
+    where: { gameId_userId: { gameId, userId } },
+  });
+
+  if (!existingParticipant) {
+    // Атомарно захватываем место
+    const captured = await tryIncrementPlayers(gameId);
+    if (!captured) {
+      // Игра заполнена — помечаем платёж как FAILED, TODO: инициировать возврат через ЮКассу
+      await prisma.payment.update({
+        where: { id: paymentId },
+        data: { status: "FAILED" },
+      });
+      return NextResponse.json({ ok: true });
+    }
+  }
+
   let referrerId: string | null = null;
   let referralAmount = 0;
 
@@ -65,11 +84,6 @@ export async function POST(req: NextRequest) {
     await tx.payment.update({
       where: { id: paymentId },
       data: { status: "SUCCESS", providerPaymentId: event.object.id },
-    });
-
-    // Участник мог быть создан при нажатии «Оплатить онлайн» — обновляем, иначе создаём
-    const existingParticipant = await tx.gameParticipant.findUnique({
-      where: { gameId_userId: { gameId, userId } },
     });
 
     if (!existingParticipant) {
@@ -82,14 +96,6 @@ export async function POST(req: NextRequest) {
           confirmed: true,
         },
       });
-
-      const game = await tx.game.update({
-        where: { id: gameId },
-        data: { playersCount: { increment: 1 } },
-      });
-      if (game.playersCount >= game.playersLimit) {
-        await tx.game.update({ where: { id: gameId }, data: { status: "FULL" } });
-      }
     } else {
       await tx.gameParticipant.update({
         where: { gameId_userId: { gameId, userId } },
