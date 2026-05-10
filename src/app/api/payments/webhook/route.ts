@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendNotification } from "@/lib/notifications/bot";
 import { isYukassaIp } from "@/lib/payments/yukassa-ips";
-import { verifyWebhookSignature } from "@/lib/payments/yukassa";
+import { verifyWebhookSignature, refundPayment } from "@/lib/payments/yukassa";
 import { tryIncrementPlayers } from "@/lib/games/atomic-join";
 
 // POST /api/payments/webhook — ЮКасса webhook
@@ -68,11 +68,16 @@ export async function POST(req: NextRequest) {
     // Атомарно захватываем место
     const captured = await tryIncrementPlayers(gameId);
     if (!captured) {
-      // Игра заполнена — помечаем платёж как FAILED, TODO: инициировать возврат через ЮКассу
+      // Игра заполнена — автовозврат через ЮКассу
       await prisma.payment.update({
         where: { id: paymentId },
-        data: { status: "FAILED" },
+        data: { status: "FAILED", providerPaymentId: event.object.id },
       });
+      try {
+        await refundPayment(event.object.id, payment.amount);
+      } catch (err) {
+        console.error("Auto-refund failed:", err);
+      }
       return NextResponse.json({ ok: true });
     }
   }

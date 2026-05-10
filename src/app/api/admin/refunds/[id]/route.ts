@@ -3,6 +3,8 @@ import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
 import { sendNotification } from "@/lib/notifications/bot";
 import { audit } from "@/lib/audit";
+import { refundPayment } from "@/lib/payments/yukassa";
+import { PaymentStatus } from "@/generated/prisma/client";
 
 // PATCH /api/admin/refunds/[id] — обновление статуса возврата (ADMIN/OWNER)
 export async function PATCH(
@@ -24,7 +26,7 @@ export async function PATCH(
 
     const refund = await prisma.refundRequest.findUnique({
       where: { id },
-      include: { user: true },
+      include: { user: true, payment: true },
     });
 
     if (!refund) {
@@ -32,6 +34,16 @@ export async function PATCH(
     }
 
     await audit("REFUND_STATUS_CHANGE", user.telegramId, `refund:${id}`, { status });
+
+    // When marking DONE, trigger the actual YuKassa refund for online payments
+    if (status === "DONE" && refund.payment?.providerPaymentId && refund.payment.status === PaymentStatus.SUCCESS) {
+      try {
+        await refundPayment(refund.payment.providerPaymentId, refund.amount);
+      } catch (err) {
+        console.error("YuKassa refund failed:", err);
+        return NextResponse.json({ error: "YuKassa refund failed" }, { status: 502 });
+      }
+    }
 
     const updated = await prisma.refundRequest.update({
       where: { id },

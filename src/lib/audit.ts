@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 
 export async function audit(
@@ -12,7 +13,7 @@ export async function audit(
         actorTelegramId: BigInt(actorTelegramId),
         action,
         target: target ?? null,
-        payload: payload ?? null,
+        payload: payload !== undefined ? (payload as Prisma.InputJsonValue) : undefined,
       },
     });
   } catch {

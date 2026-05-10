@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { decrementPlayers } from "@/lib/games/atomic-join";
+import { cancelPayment } from "@/lib/payments/yukassa";
 
 // POST /api/cron/cleanup-pending — удаление протухших YUKASSA-PENDING записей (>30 мин)
 export async function POST(req: NextRequest) {
@@ -29,6 +30,14 @@ export async function POST(req: NextRequest) {
     });
     await decrementPlayers(participant.gameId);
     if (participant.payment) {
+      if (participant.payment.providerPaymentId) {
+        try {
+          await cancelPayment(participant.payment.providerPaymentId);
+        } catch {
+          // Best-effort: log but don't block cleanup
+          console.error("YuKassa cancel failed for payment", participant.payment.providerPaymentId);
+        }
+      }
       await prisma.payment.update({
         where: { id: participant.payment.id },
         data: { status: "FAILED" },
