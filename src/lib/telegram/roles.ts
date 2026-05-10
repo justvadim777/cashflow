@@ -9,8 +9,8 @@ const HOST_IDS = parseIds(process.env.HOST_TELEGRAM_IDS);
 
 export function getRoleByTelegramId(id: string | number | bigint): UserRole {
   const s = id.toString();
-  if (OWNER_IDS.has(s)) return "OWNER";
   if (ADMIN_IDS.has(s)) return "ADMIN";
+  if (OWNER_IDS.has(s)) return "OWNER";
   if (HOST_IDS.has(s)) return "HOST";
   return "PLAYER";
 }
