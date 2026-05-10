@@ -1,10 +1,25 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useUserStore } from "@/store/user";
 import { useUiStore } from "@/store/ui";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
+import { api } from "@/lib/api";
+
+interface NextGame {
+  id: string;
+  date: string;
+  time: string;
+  type: string;
+  price: number;
+  playersCount: number;
+  playersLimit: number;
+  status: string;
+  isParticipant: boolean;
+  isConfirmed: boolean;
+}
 
 const LEVEL_LABELS: Record<string, string> = {
   NEWBIE: "Новичок",
@@ -27,6 +42,13 @@ function openTgLink(url: string) {
 export default function DashboardPage() {
   const { displayName, totalPoints, level, referralCode } = useUserStore();
   const { dismissedSubscribeBanner, dismissSubscribeBanner } = useUiStore();
+  const [nextGame, setNextGame] = useState<NextGame | null | undefined>(undefined);
+
+  useEffect(() => {
+    api<{ game: NextGame | null }>("/games/next")
+      .then((d) => setNextGame(d.game))
+      .catch(() => setNextGame(null));
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -77,6 +99,53 @@ export default function DashboardPage() {
           <p className="text-2xl font-bold text-gold">{totalPoints}</p>
         </div>
       </Card>
+
+      {/* Ближайшая игра */}
+      {nextGame !== undefined && (
+        nextGame ? (
+          <Link href={`/games/${nextGame.id}`}>
+            <Card className="hover:border-accent/30 transition-colors">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
+                  Ближайшая игра
+                </p>
+                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                  nextGame.type === "MAIN" ? "bg-gold/20 text-gold" : "bg-accent/20 text-accent"
+                }`}>
+                  {nextGame.type}
+                </span>
+              </div>
+              <p className="font-bold text-lg">
+                {new Date(nextGame.date).toLocaleDateString("ru-RU", {
+                  day: "numeric",
+                  month: "long",
+                })}{" "}
+                в {nextGame.time}
+              </p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-text-secondary text-sm">
+                  {nextGame.playersCount}/{nextGame.playersLimit} игроков
+                </p>
+                {nextGame.isParticipant ? (
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                    nextGame.isConfirmed ? "text-success bg-success/10" : "text-gold bg-gold/10"
+                  }`}>
+                    {nextGame.isConfirmed ? "Записан" : "Ожидание"}
+                  </span>
+                ) : (
+                  <span className="text-gold text-sm font-bold">
+                    {(nextGame.price / 100).toLocaleString("ru-RU")} ₽
+                  </span>
+                )}
+              </div>
+            </Card>
+          </Link>
+        ) : (
+          <Card className="text-center py-4">
+            <p className="text-text-secondary text-sm">Ближайших игр нет</p>
+          </Card>
+        )
+      )}
 
       {/* Быстрые действия */}
       <div className="grid grid-cols-2 gap-3">
