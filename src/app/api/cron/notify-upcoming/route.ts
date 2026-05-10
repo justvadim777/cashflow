@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
           id: { notIn: Array.from(participantIds) },
           OR: [
             { payments: { some: { status: "SUCCESS", createdAt: { gte: thirtyDaysAgo } } } },
-            { gameResults: { some: { createdAt: { gte: thirtyDaysAgo } } } },
+            { gameResults: { some: { game: { date: { gte: thirtyDaysAgo } } } } },
           ],
         },
         select: { id: true, telegramId: true },

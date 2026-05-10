@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const inactive = await prisma.user.findMany({
     where: {
       payments: { none: { status: "SUCCESS", createdAt: { gte: thirtyDaysAgo } } },
-      gameResults: { none: { createdAt: { gte: thirtyDaysAgo } } },
+      gameResults: { none: { game: { date: { gte: thirtyDaysAgo } } } },
       // Исключить совсем новых (регистрация < 7 дней) — они ещё не "неактивные"
       createdAt: { lt: new Date(Date.now() - 7 * 24 * 3600 * 1000) },
     },

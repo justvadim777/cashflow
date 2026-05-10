@@ -31,9 +31,12 @@ const LEVEL_LABELS: Record<string, string> = {
 const TG_CHANNEL = process.env.NEXT_PUBLIC_TG_CHANNEL_URL ?? "https://t.me/cashflow_channel";
 const TG_LOUNGE = process.env.NEXT_PUBLIC_TG_LOUNGE_URL ?? "https://t.me/ostrov_lounge";
 
+type TgWindow = Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } };
+
 function openTgLink(url: string) {
-  if (typeof window !== "undefined" && (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp?.openTelegramLink) {
-    (window as Window & { Telegram: { WebApp: { openTelegramLink: (u: string) => void } } }).Telegram.WebApp.openTelegramLink(url);
+  const tgWin = typeof window !== "undefined" ? (window as unknown as TgWindow) : null;
+  if (tgWin?.Telegram?.WebApp?.openTelegramLink) {
+    tgWin.Telegram.WebApp.openTelegramLink(url);
   } else {
     window.open(url, "_blank");
   }
