@@ -52,7 +52,7 @@ interface CashParticipant {
   paymentMethod: string;
   joinedAt: string;
   user: { displayName: string; username: string | null };
-  game: { id: string; date: string; time: string };
+  game: { id: string; date: string; time: string; price: number };
 }
 
 interface RefundRequest {
@@ -78,6 +78,7 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState<Record<string, unknown> | null>(null);
   const [refunds, setRefunds] = useState<RefundRequest[]>([]);
   const [cashParticipants, setCashParticipants] = useState<CashParticipant[]>([]);
+  const [cashAmounts, setCashAmounts] = useState<Record<string, number>>({});
 
   // Создание игры
   const [newGame, setNewGame] = useState({
@@ -433,14 +434,31 @@ export default function AdminPage() {
                   </div>
                   <p className="text-gold text-xs font-semibold">CASH</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    min={0}
+                    value={cashAmounts[`${p.game.id}-${p.userId}`] ?? Math.round((p.game.price ?? 0) / 100)}
+                    onChange={(e) =>
+                      setCashAmounts((prev) => ({
+                        ...prev,
+                        [`${p.game.id}-${p.userId}`]: Number(e.target.value),
+                      }))
+                    }
+                    className="w-24 bg-bg border border-border rounded-lg px-2 py-1 text-center text-white text-sm"
+                    placeholder="Сумма ₽"
+                  />
+                  <span className="text-text-secondary text-xs">₽</span>
+                </div>
+                <div className="flex gap-2 mt-2">
                   <Button
                     size="sm"
                     className="flex-1"
                     onClick={async () => {
+                      const amount = cashAmounts[`${p.game.id}-${p.userId}`] ?? Math.round((p.game.price ?? 0) / 100);
                       await api(`/games/${p.game.id}/confirm`, {
                         method: "PATCH",
-                        body: JSON.stringify({ userId: p.userId, action: "confirm" }),
+                        body: JSON.stringify({ userId: p.userId, action: "confirm", amount }),
                       });
                       setCashParticipants((prev) =>
                         prev.map((x) =>
@@ -544,21 +562,43 @@ export default function AdminPage() {
               <p className="text-2xl font-bold">{analytics.totalGames as number}</p>
             </Card>
             <Card>
-              <p className="text-text-secondary text-xs">Активных</p>
+              <p className="text-text-secondary text-xs">Активных игр</p>
               <p className="text-2xl font-bold text-success">
                 {analytics.activeGames as number}
               </p>
             </Card>
             <Card>
-              <p className="text-text-secondary text-xs">Выручка</p>
-              <p className="text-2xl font-bold text-gold">
-                {(
-                  (analytics.totalRevenue as number) / 100
-                ).toLocaleString("ru-RU")}{" "}
-                ₽
+              <p className="text-text-secondary text-xs">Оплаченные</p>
+              <p className="text-2xl font-bold">{analytics.paidCount as number}</p>
+              <p className="text-text-secondary text-xs mt-1">
+                Новые: {analytics.firstPaidCount as number}
               </p>
             </Card>
           </div>
+          {/* Выручка */}
+          <Card>
+            <p className="text-text-secondary text-xs mb-2">Выручка</p>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-sm text-text-secondary">ЮКасса</span>
+                <span className="text-sm font-semibold">
+                  {((analytics.yukassaRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-text-secondary">Наличные</span>
+                <span className="text-sm font-semibold">
+                  {((analytics.cashRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-border pt-1 mt-1">
+                <span className="text-sm font-semibold">Итого</span>
+                <span className="text-lg font-bold text-gold">
+                  {((analytics.totalRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                </span>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
     </div>

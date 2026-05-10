@@ -18,7 +18,11 @@ export async function PATCH(
 
     const { id: gameId } = await params;
     const body = await _req.json();
-    const { userId, action } = body as { userId: string; action: "confirm" | "reject" };
+    const { userId, action, amount } = body as {
+      userId: string;
+      action: "confirm" | "reject";
+      amount?: number; // в рублях, опционально для CASH
+    };
 
     if (!userId || !action) {
       return NextResponse.json({ error: "Missing userId or action" }, { status: 400 });
@@ -40,9 +44,15 @@ export async function PATCH(
     );
 
     if (action === "confirm") {
+      // manualPaidAmount: если CASH и передан amount (в рублях) → сохраняем в копейках
+      const manualPaidAmount =
+        participant.paymentMethod === "CASH" && amount != null
+          ? Math.round(amount * 100)
+          : undefined;
+
       await prisma.gameParticipant.update({
         where: { gameId_userId: { gameId, userId } },
-        data: { confirmed: true },
+        data: { confirmed: true, ...(manualPaidAmount != null ? { manualPaidAmount } : {}) },
       });
 
       // Реферальный бонус только для CASH-оплаты

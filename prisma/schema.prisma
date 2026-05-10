@@ -129,9 +129,10 @@ model GameParticipant {
   user          User          @relation(fields: [userId], references: [id])
   paymentId     String?       @unique @map("payment_id")
   payment       Payment?      @relation(fields: [paymentId], references: [id])
-  paymentMethod PaymentMethod @default(YUKASSA) @map("payment_method")
-  confirmed     Boolean       @default(false)
-  joinedAt      DateTime      @default(now()) @map("joined_at")
+  paymentMethod    PaymentMethod @default(YUKASSA) @map("payment_method")
+  confirmed        Boolean       @default(false)
+  manualPaidAmount Int?          @map("manual_paid_amount") // в копейках, для CASH-подтверждений
+  joinedAt         DateTime      @default(now()) @map("joined_at")
 
   @@unique([gameId, userId])
   @@map("game_participants")
