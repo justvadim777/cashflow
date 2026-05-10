@@ -139,6 +139,26 @@ ENV
 
 chmod 600 $APP_DIR/.env.production
 
+# 12. Crontab
+echo ">>> Настройка crontab..."
+NEXTAUTH_SECRET_VAL=$(grep NEXTAUTH_SECRET $APP_DIR/.env.production | cut -d'"' -f2)
+(crontab -l 2>/dev/null; cat <<CRON
+# Cashflow cron jobs
+*/15 * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/notify-upcoming >> /var/log/cashflow-cron.log 2>&1
+*/5  * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/cleanup-pending >> /var/log/cashflow-cron.log 2>&1
+*/15 * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/finish-games >> /var/log/cashflow-cron.log 2>&1
+*/5  * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/expire-waitlist >> /var/log/cashflow-cron.log 2>&1
+0 3 * * *   sudo -u postgres pg_dump cashflow | gzip > /backups/cashflow_$(date +\%Y\%m\%d).sql.gz
+0 4 * * 0   find /backups -name "cashflow_*.sql.gz" -mtime +30 -delete
+CRON
+) | crontab -
+
+# 13. Директория для бэкапов
+echo ">>> Создание директории бэкапов..."
+mkdir -p /backups
+chmod 700 /backups
+chown postgres:postgres /backups
+
 echo ""
 echo "========================================="
 echo "  Настройка завершена!"
