@@ -34,13 +34,21 @@ async function main() {
     detail: me.ok ? `@${me.result.username}` : me.description,
   });
 
-  // Webhook info
+  // Webhook info — auto-reregister if missing
   const wh = await fetch(`https://api.telegram.org/bot${TOKEN}/getWebhookInfo`).then((r) =>
     r.json() as Promise<{ ok: boolean; result: { url: string; pending_update_count: number; last_error_message?: string } }>
   );
+  const webhookOk = wh.ok && wh.result.url?.includes("72-56-250-40");
+  if (!webhookOk) {
+    await fetch(`https://api.telegram.org/bot${TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: `${PROD}/api/bot` }),
+    });
+  }
   checks.push({
     name: "Telegram webhook",
-    ok: wh.ok && wh.result.url?.includes("72-56-250-40"),
+    ok: webhookOk,
     detail: `${wh.result.url} pending=${wh.result.pending_update_count} last_error=${wh.result.last_error_message ?? "none"}`,
   });
 
