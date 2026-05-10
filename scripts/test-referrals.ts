@@ -4,9 +4,11 @@
  */
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { forgeInitData } from "./lib/forge-init-data";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+const prisma = new PrismaClient({ adapter });
 const PROD = "https://72-56-250-40.sslip.io";
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const ADMIN_TG_ID = Number(process.env.ADMIN_TELEGRAM_IDS!.split(",")[0]);
@@ -37,9 +39,13 @@ async function clearTestData() {
     await prisma.gameResult.deleteMany({ where: { userId: { in: ids } } });
     await prisma.payment.deleteMany({ where: { userId: { in: ids } } });
     await prisma.gameParticipant.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.achievement.deleteMany({ where: { userId: { in: ids } } });
+  }
+  // Игры удаляем ДО пользователей (FK games.created_by_id)
+  await prisma.game.deleteMany({ where: { id: { startsWith: "ref-test-" } } });
+  if (ids.length) {
     await prisma.user.deleteMany({ where: { telegramId: { in: tgIds } } });
   }
-  await prisma.game.deleteMany({ where: { id: { startsWith: "ref-test-" } } });
 }
 
 async function api(path: string, init: RequestInit = {}): Promise<{ status: number; body: unknown }> {
