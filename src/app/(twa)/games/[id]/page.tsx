@@ -40,6 +40,8 @@ export default function GameDetailPage() {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [inWaitlist, setInWaitlist] = useState(false);
+  const [joiningWaitlist, setJoiningWaitlist] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -88,6 +90,18 @@ export default function GameDetailPage() {
       alert(e instanceof Error ? e.message : "Ошибка записи");
     }
     setRegistering(false);
+  }
+
+  async function handleJoinWaitlist() {
+    if (!game) return;
+    setJoiningWaitlist(true);
+    try {
+      await api(`/games/${game.id}/waitlist`, { method: "POST" });
+      setInWaitlist(true);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка");
+    }
+    setJoiningWaitlist(false);
   }
 
   async function handleCancel() {
@@ -183,6 +197,26 @@ export default function GameDetailPage() {
       </Card>
 
       {/* Кнопки действий */}
+      {game.status === "FULL" && !isParticipant && (
+        <div className="space-y-2">
+          {inWaitlist ? (
+            <Card className="text-center bg-gold/10 border-gold/30">
+              <p className="text-gold font-semibold">Вы в листе ожидания</p>
+              <p className="text-text-secondary text-xs mt-1">Уведомим, когда освободится место</p>
+            </Card>
+          ) : (
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={handleJoinWaitlist}
+              disabled={joiningWaitlist}
+            >
+              {joiningWaitlist ? "..." : "Встать в лист ожидания"}
+            </Button>
+          )}
+        </div>
+      )}
+
       {game.status === "OPEN" && !isParticipant && (
         <div className="space-y-2">
           <Button

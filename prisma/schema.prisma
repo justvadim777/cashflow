@@ -91,6 +91,7 @@ model User {
   achievements    Achievement[]
   createdGames    Game[]
   refundRequests  RefundRequest[]
+  waitlists       GameWaitlist[]
 
   @@map("users")
 }
@@ -115,6 +116,7 @@ model Game {
   results        GameResult[]
   referrals      Referral[]
   refundRequests RefundRequest[]
+  waitlists      GameWaitlist[]
 
   @@map("games")
 }
@@ -226,6 +228,19 @@ model Achievement {
 
   @@unique([userId, type])
   @@map("achievements")
+}
+
+model GameWaitlist {
+  id         String    @id @default(cuid())
+  gameId     String    @map("game_id")
+  game       Game      @relation(fields: [gameId], references: [id])
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id])
+  joinedAt   DateTime  @default(now()) @map("joined_at")
+  notifiedAt DateTime? @map("notified_at")
+
+  @@unique([gameId, userId])
+  @@map("game_waitlists")
 }
 
 model NotificationLog {
