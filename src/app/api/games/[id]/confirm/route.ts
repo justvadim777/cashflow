@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
 import { sendNotification } from "@/lib/notifications/bot";
+import { decrementPlayers } from "@/lib/games/atomic-join";
 
 // PATCH /api/games/[id]/confirm — подтверждение/отклонение записи (ADMIN)
 // body: { userId: string, action: "confirm" | "reject" }
@@ -72,18 +73,10 @@ export async function PATCH(
         `Твоя запись на игру подтверждена. Ждём тебя в Остров Lounge!`
       );
     } else if (action === "reject") {
-      await prisma.$transaction(async (tx) => {
-        await tx.gameParticipant.delete({
-          where: { gameId_userId: { gameId, userId } },
-        });
-        await tx.game.update({
-          where: { id: gameId },
-          data: {
-            playersCount: { decrement: 1 },
-            status: "OPEN",
-          },
-        });
+      await prisma.gameParticipant.delete({
+        where: { gameId_userId: { gameId, userId } },
       });
+      await decrementPlayers(gameId);
 
       await sendNotification(
         participant.user.telegramId,
