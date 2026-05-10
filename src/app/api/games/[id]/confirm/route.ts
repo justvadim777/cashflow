@@ -38,6 +38,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     }
 
+    // Защита от двойного confirm
+    if (action === "confirm" && participant.confirmed) {
+      return NextResponse.json({ error: "Already confirmed" }, { status: 409 });
+    }
+
     await audit(
       action === "confirm" ? "PARTICIPANT_CONFIRM" : "PARTICIPANT_REJECT",
       user.telegramId,
