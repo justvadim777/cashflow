@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
-import { calculateTotalPoints, calculateLevel } from "@/lib/points/calculate";
+import { calculateTotalPoints, recalcUserStatsAfterResult, getLevelName } from "@/lib/points/calculate";
 import type { ResultInput } from "@/lib/points/calculate";
+import { checkGameAchievements } from "@/lib/achievements/check";
+import { sendNotification } from "@/lib/notifications/bot";
+import { NOTIFICATION_TEMPLATES } from "@/lib/notifications/templates";
 
 // POST /api/results — ввод результатов (HOST / ADMIN)
 export async function POST(req: NextRequest) {
@@ -18,7 +21,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing gameId or userId" }, { status: 400 });
     }
 
-    // Ведущий видит только свои игры
     if (user.role === "HOST") {
       const game = await prisma.game.findUnique({ where: { id: gameId } });
       if (!game || game.createdById !== user.id) {
@@ -26,7 +28,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Проверка: участник в игре
     const participant = await prisma.gameParticipant.findUnique({
       where: { gameId_userId: { gameId, userId } },
     });
@@ -61,34 +62,36 @@ export async function POST(req: NextRequest) {
 
     const result = await prisma.gameResult.upsert({
       where: { gameId_userId: { gameId, userId } },
-      create: {
-        gameId,
-        userId,
-        ...resultInput,
-        totalPoints,
-      },
-      update: {
-        ...resultInput,
-        totalPoints,
-      },
+      create: { gameId, userId, ...resultInput, totalPoints },
+      update: { ...resultInput, totalPoints },
     });
 
-    // Пересчитать общие баллы пользователя
-    const allResults = await prisma.gameResult.findMany({
-      where: { userId },
-      select: { totalPoints: true },
-    });
-    const userTotalPoints = allResults.reduce((sum: number, r: { totalPoints: number }) => sum + r.totalPoints, 0);
-    const newLevel = calculateLevel(userTotalPoints);
+    // Пересчёт уровня и баллов
+    const { totalPoints: userTotal, newLevel, levelUp } = await recalcUserStatsAfterResult(userId);
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        totalPoints: userTotalPoints,
-        level: newLevel,
-      },
-    });
+    // Место в общем рейтинге
+    const rank =
+      (await prisma.user.count({ where: { totalPoints: { gt: userTotal } } })) + 1;
 
-    return NextResponse.json({ result, userTotalPoints, newLevel });
+    // Пуш игроку с результатом
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (targetUser) {
+      await sendNotification(
+        targetUser.telegramId,
+        NOTIFICATION_TEMPLATES.GAME_RESULT(totalPoints, rank)
+      );
+
+      if (levelUp) {
+        await sendNotification(
+          targetUser.telegramId,
+          NOTIFICATION_TEMPLATES.LEVEL_UP(getLevelName(newLevel))
+        );
+      }
+    }
+
+    // Проверка достижений
+    const newAchievements = await checkGameAchievements(userId);
+
+    return NextResponse.json({ result, userTotalPoints: userTotal, newLevel, rank, newAchievements });
   });
 }
