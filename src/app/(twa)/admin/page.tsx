@@ -663,21 +663,61 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Выручка по оплатам */}
+          {/* Выручка общая */}
           <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">ВЫРУЧКА ПО ОПЛАТАМ</p>
+            <p className="text-text-secondary text-xs font-semibold mb-2">ВЫРУЧКА ИТОГО (онлайн + наличные)</p>
             <div className="grid grid-cols-2 gap-3">
               <Card>
                 <p className="text-text-secondary text-xs">Всего</p>
                 <p className="text-xl font-bold text-gold">
-                  {((analytics.totalRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                  {((analytics.totalRevenueAll as number) / 100).toLocaleString("ru-RU")} ₽
                 </p>
               </Card>
               <Card>
                 <p className="text-text-secondary text-xs">За месяц</p>
                 <p className="text-xl font-bold text-gold">
+                  {((analytics.monthRevenueAll as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+              </Card>
+            </div>
+          </div>
+
+          {/* Выручка онлайн */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">💳 ОНЛАЙН-ОПЛАТЫ (ЮКасса)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Всего</p>
+                <p className="text-xl font-bold text-accent">
+                  {((analytics.totalRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">За месяц</p>
+                <p className="text-xl font-bold text-accent">
                   {((analytics.monthRevenue as number) / 100).toLocaleString("ru-RU")} ₽
                 </p>
+              </Card>
+            </div>
+          </div>
+
+          {/* Выручка наличные */}
+          <div>
+            <p className="text-text-secondary text-xs font-semibold mb-2">💵 ОПЛАТА НАЛИЧНЫМИ</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-text-secondary text-xs">Всего</p>
+                <p className="text-xl font-bold text-success">
+                  {((analytics.cashRevenueTotal as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+                <p className="text-text-secondary text-xs mt-1">{analytics.cashParticipantsTotal as number} чел.</p>
+              </Card>
+              <Card>
+                <p className="text-text-secondary text-xs">За месяц</p>
+                <p className="text-xl font-bold text-success">
+                  {((analytics.cashRevenueMonth as number) / 100).toLocaleString("ru-RU")} ₽
+                </p>
+                <p className="text-text-secondary text-xs mt-1">{analytics.cashParticipantsMonth as number} чел.</p>
               </Card>
             </div>
           </div>

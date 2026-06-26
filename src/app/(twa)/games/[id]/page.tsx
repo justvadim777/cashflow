@@ -43,6 +43,7 @@ export default function GameDetailPage() {
   const [isParticipant, setIsParticipant] = useState(false);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -60,6 +61,25 @@ export default function GameDetailPage() {
     }
     load();
   }, [id, router]);
+
+  async function handlePayOnline() {
+    if (!game) return;
+    setPaymentLoading(true);
+    try {
+      const res = await api<{ paymentUrl: string }>("/payments", {
+        method: "POST",
+        body: JSON.stringify({ gameId: game.id }),
+      });
+      if (res.paymentUrl) {
+        window.open(res.paymentUrl, "_blank");
+        setIsParticipant(true);
+        setGame({ ...game, playersCount: game.playersCount + 1 });
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка оплаты");
+    }
+    setPaymentLoading(false);
+  }
 
   async function handleRegister() {
     if (!game) return;
@@ -155,22 +175,36 @@ export default function GameDetailPage() {
         </div>
       </Card>
 
-      {/* Кнопка записи */}
+      {/* Кнопки записи */}
       {game.status === "OPEN" && !isParticipant && (
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={handleRegister}
-          disabled={registering}
-        >
-          {registering ? "Записываем..." : "Записаться на игру"}
-        </Button>
+        <div className="space-y-3">
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={handlePayOnline}
+            disabled={paymentLoading || registering}
+          >
+            {paymentLoading ? "Создаём платёж..." : `Оплатить онлайн — ${(game.price / 100).toLocaleString("ru-RU")} ₽`}
+          </Button>
+          <Button
+            variant="secondary"
+            className="w-full"
+            size="lg"
+            onClick={handleRegister}
+            disabled={registering || paymentLoading}
+          >
+            {registering ? "Записываем..." : "Оплатить на месте"}
+          </Button>
+          <p className="text-text-secondary text-xs text-center">
+            При оплате на месте — ожидайте подтверждения от организатора
+          </p>
+        </div>
       )}
       {isParticipant && game.status !== "FINISHED" && (
         <>
           <Card className="text-center bg-success/10 border-success/30">
             <p className="text-success font-semibold">Вы записаны на эту игру</p>
-            <p className="text-text-secondary text-xs mt-1">Организатор свяжется с вами для оплаты</p>
+            <p className="text-text-secondary text-xs mt-1">Ожидайте подтверждения от организатора</p>
           </Card>
           <Button
             variant="secondary"

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { checkGameAchievements, checkReferralAchievement } from "@/lib/achievements/check";
+import { sendNotification } from "@/lib/notifications/bot";
 
 // POST /api/payments/webhook — ЮКасса webhook
 export async function POST(req: NextRequest) {
@@ -45,12 +46,13 @@ export async function POST(req: NextRequest) {
       data: { status: "SUCCESS", providerPaymentId: event.object.id },
     });
 
-    // Добавить участника в игру
+    // Добавить участника в игру (онлайн-оплата = сразу подтверждён)
     await tx.gameParticipant.create({
       data: {
         gameId,
         userId,
         paymentId,
+        confirmed: true,
       },
     });
 
@@ -95,6 +97,30 @@ export async function POST(req: NextRequest) {
   const paidUser = await prisma.user.findUnique({ where: { id: userId } });
   if (paidUser?.referredById) {
     await checkReferralAchievement(paidUser.referredById);
+  }
+
+  // Уведомить игрока об успешной оплате
+  const gameForNotify = await prisma.game.findUnique({ where: { id: gameId } });
+  if (paidUser && gameForNotify) {
+    const gameDate = new Date(gameForNotify.date).toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+    });
+    await sendNotification(
+      paidUser.telegramId,
+      `✅ <b>Оплата прошла!</b>\n\nТы в списке игроков на игру <b>${gameDate}</b> в <b>${gameForNotify.time}</b>.\n\nЖдём в Остров Lounge!`
+    );
+
+    // Уведомить админов об онлайн-оплате
+    const admins = await prisma.user.findMany({
+      where: { role: { in: ["ADMIN", "OWNER"] } },
+      select: { telegramId: true },
+    });
+    const userInfo = paidUser.username ? `@${paidUser.username}` : paidUser.displayName;
+    const adminText = `💳 <b>Онлайн-оплата получена</b>\n\n${paidUser.displayName} (${userInfo}) оплатил игру <b>${gameDate}</b> в <b>${gameForNotify.time}</b>.\n\n✅ Участник автоматически подтверждён.`;
+    for (const admin of admins) {
+      await sendNotification(admin.telegramId, adminText);
+    }
   }
 
   return NextResponse.json({ ok: true });

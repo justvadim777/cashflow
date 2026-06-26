@@ -38,8 +38,28 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4">
+      {/* Каналы */}
+      <div className="flex gap-2 pt-2">
+        <a
+          href="https://t.me/CashFlow_VTR"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-card border border-border rounded-xl py-2 text-xs font-semibold text-accent hover:border-accent/40 transition-colors"
+        >
+          📢 Канал Cashflow
+        </a>
+        <a
+          href="https://t.me/ostrovnezh"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-card border border-border rounded-xl py-2 text-xs font-semibold text-accent hover:border-accent/40 transition-colors"
+        >
+          🏝 Остров Lounge
+        </a>
+      </div>
+
       {/* Приветствие */}
-      <div className="pt-2">
+      <div>
         <h1 className="text-2xl font-bold">
           Привет, {displayName || "Игрок"}
         </h1>
@@ -148,19 +168,39 @@ export default function DashboardPage() {
         </Link>
       </div>
 
+      {/* Каналы снизу */}
+      <div className="flex gap-2">
+        <a
+          href="https://t.me/CashFlow_VTR"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-card border border-border rounded-xl py-2.5 text-xs font-semibold text-accent hover:border-accent/40 transition-colors"
+        >
+          📢 Подписаться на канал
+        </a>
+        <a
+          href="https://t.me/ostrovnezh"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-card border border-border rounded-xl py-2.5 text-xs font-semibold text-accent hover:border-accent/40 transition-colors"
+        >
+          🏝 Остров Lounge
+        </a>
+      </div>
+
       {/* Реферальный код */}
       {referralCode && (
         <Card>
           <p className="text-text-secondary text-sm mb-2">Твоя реферальная ссылка</p>
           <div className="flex items-center gap-2">
             <code className="flex-1 bg-bg rounded-lg px-3 py-2 text-sm text-accent truncate">
-              t.me/denezhnyjpotok_bot?start=ref_{referralCode}
+              t.me/CashFlow_VTR_bot?start=ref_{referralCode}
             </code>
             <Button
               size="sm"
               onClick={() => {
                 navigator.clipboard.writeText(
-                  `https://t.me/denezhnyjpotok_bot?start=ref_${referralCode}`
+                  `https://t.me/CashFlow_VTR_bot?start=ref_${referralCode}`
                 );
               }}
             >

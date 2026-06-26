@@ -33,6 +33,8 @@ export async function GET(req: NextRequest) {
       newPaidThisWeek,
       totalRevenue,
       monthRevenue,
+      cashParticipantsTotal,
+      cashParticipantsMonth,
       hookahRevenueTotal,
       hookahRevenueMonth,
       hookahGamesTotal,
@@ -58,7 +60,7 @@ export async function GET(req: NextRequest) {
       // Новые оплаченные (подтверждённые) за месяц/неделю
       prisma.gameParticipant.count({ where: { confirmed: true, joinedAt: { gte: monthStart } } }),
       prisma.gameParticipant.count({ where: { confirmed: true, joinedAt: { gte: weekStart } } }),
-      // Выручка по оплатам
+      // Выручка по онлайн-оплатам
       prisma.payment.aggregate({
         where: { status: "SUCCESS" },
         _sum: { amount: true },
@@ -66,6 +68,13 @@ export async function GET(req: NextRequest) {
       prisma.payment.aggregate({
         where: { status: "SUCCESS", createdAt: { gte: monthStart } },
         _sum: { amount: true },
+      }),
+      // Количество оплативших наличными (confirmed=true, paymentId=null)
+      prisma.gameParticipant.count({
+        where: { confirmed: true, paymentId: null },
+      }),
+      prisma.gameParticipant.count({
+        where: { confirmed: true, paymentId: null, joinedAt: { gte: monthStart } },
       }),
       // Выручка кальянки
       prisma.gameResult.aggregate({
@@ -123,10 +132,26 @@ export async function GET(req: NextRequest) {
       _avg: { totalPoints: true },
     });
 
+    // Сумма наличных — берём участников без paymentId и суммируем цену их игр
+    const cashParticipantsWithGames = await prisma.gameParticipant.findMany({
+      where: { confirmed: true, paymentId: null },
+      include: { game: { select: { price: true } } },
+    });
+    const cashRevenueTotal = cashParticipantsWithGames.reduce((sum, p) => sum + p.game.price, 0);
+
+    const cashParticipantsMonthWithGames = await prisma.gameParticipant.findMany({
+      where: { confirmed: true, paymentId: null, joinedAt: { gte: monthStart } },
+      include: { game: { select: { price: true } } },
+    });
+    const cashRevenueMonth = cashParticipantsMonthWithGames.reduce((sum, p) => sum + p.game.price, 0);
+
     const hookahTotal = hookahRevenueTotal._sum.hookahRevenue || 0;
     const hookahMonth = hookahRevenueMonth._sum.hookahRevenue || 0;
     const hookahAvgTotal = hookahGamesTotal > 0 ? Math.round(hookahTotal / hookahGamesTotal) : 0;
     const hookahAvgMonth = hookahGamesMonth > 0 ? Math.round(hookahMonth / hookahGamesMonth) : 0;
+
+    const onlineRevenueTotal = totalRevenue._sum.amount || 0;
+    const onlineRevenueMonth = monthRevenue._sum.amount || 0;
 
     return NextResponse.json({
       totalUsers,
@@ -140,8 +165,17 @@ export async function GET(req: NextRequest) {
       pendingParticipants,
       newPaidThisMonth,
       newPaidThisWeek,
-      totalRevenue: totalRevenue._sum.amount || 0,
-      monthRevenue: monthRevenue._sum.amount || 0,
+      // Онлайн-оплаты (ЮКасса)
+      totalRevenue: onlineRevenueTotal,
+      monthRevenue: onlineRevenueMonth,
+      // Наличные
+      cashParticipantsTotal,
+      cashParticipantsMonth,
+      cashRevenueTotal,
+      cashRevenueMonth,
+      // Итоговая выручка (онлайн + наличные)
+      totalRevenueAll: onlineRevenueTotal + cashRevenueTotal,
+      monthRevenueAll: onlineRevenueMonth + cashRevenueMonth,
       hookahRevenueTotal: hookahTotal,
       hookahRevenueMonth: hookahMonth,
       hookahAvgTotal,

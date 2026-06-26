@@ -52,7 +52,7 @@ export async function POST(
       month: "long",
     });
     const userInfo = user.username ? `@${user.username}` : user.displayName;
-    const notifyText = `🆕 <b>Новая запись на игру</b>\n\n${user.displayName} (${userInfo}) записался на игру <b>${gameDate}</b> в <b>${game.time}</b>.\n\nОжидает подтверждения оплаты.`;
+    const notifyText = `🆕 <b>Новая запись (оплата на месте)</b>\n\n${user.displayName} (${userInfo}) записался на игру <b>${gameDate}</b> в <b>${game.time}</b>.\n\n💵 Выбрал оплату наличными на месте. Подтвердите после получения оплаты.`;
 
     // Получить всех админов и ведущего
     const admins = await prisma.user.findMany({

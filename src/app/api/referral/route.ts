@@ -40,9 +40,9 @@ export async function GET(req: NextRequest) {
       .filter((r: { status: string }) => r.status === "SUCCESS")
       .reduce((sum: number, r: { amount: number }) => sum + r.amount, 0);
 
-    // Список приглашённых с суммой и количеством оплат
+    // Список приглашённых с суммой и количеством успешных оплат
     const invited = invitedUsers.map((u) => {
-      const paidCount = referrals.filter((r) => r.referredId === u.id).length;
+      const paidCount = referrals.filter((r) => r.referredId === u.id && r.status === "SUCCESS").length;
       return {
         id: u.id,
         displayName: u.displayName,
