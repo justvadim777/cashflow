@@ -19,7 +19,9 @@ interface GameDetail {
   description: string | null;
   createdBy: { id: string; displayName: string };
   participants: {
+    userId: string;
     confirmed: boolean;
+    paymentMethod: "YUKASSA" | "CASH";
     user: {
       id: string;
       displayName: string;
@@ -42,8 +44,10 @@ export default function GameDetailPage() {
   const [game, setGame] = useState<GameDetail | null>(null);
   const [isParticipant, setIsParticipant] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
   const [registering, setRegistering] = useState(false);
-  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [inWaitlist, setInWaitlist] = useState(false);
+  const [joiningWaitlist, setJoiningWaitlist] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -63,25 +67,6 @@ export default function GameDetailPage() {
   }, [id, router]);
 
   async function handlePayOnline() {
-    if (!game) return;
-    setPaymentLoading(true);
-    try {
-      const res = await api<{ paymentUrl: string }>("/payments", {
-        method: "POST",
-        body: JSON.stringify({ gameId: game.id }),
-      });
-      if (res.paymentUrl) {
-        window.open(res.paymentUrl, "_blank");
-        setIsParticipant(true);
-        setGame({ ...game, playersCount: game.playersCount + 1 });
-      }
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка оплаты");
-    }
-    setPaymentLoading(false);
-  }
-
-  async function handleRegister() {
     if (!game) return;
     setRegistering(true);
     try {
@@ -108,6 +93,33 @@ export default function GameDetailPage() {
     setRegistering(false);
   }
 
+  async function handleRegisterCash() {
+    if (!game) return;
+    setRegistering(true);
+    try {
+      await api(`/games/${game.id}/register`, { method: "POST" });
+      setIsParticipant(true);
+      setGame((prev) =>
+        prev ? { ...prev, playersCount: prev.playersCount + 1 } : prev
+      );
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка записи");
+    }
+    setRegistering(false);
+  }
+
+  async function handleJoinWaitlist() {
+    if (!game) return;
+    setJoiningWaitlist(true);
+    try {
+      await api(`/games/${game.id}/waitlist`, { method: "POST" });
+      setInWaitlist(true);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка");
+    }
+    setJoiningWaitlist(false);
+  }
+
   if (loading || !game) {
     return (
       <div className="flex justify-center py-12">
@@ -115,6 +127,10 @@ export default function GameDetailPage() {
       </div>
     );
   }
+
+  const myParticipant = game.participants.find((p) => p.userId !== undefined);
+  const isConfirmed = myParticipant?.confirmed ?? false;
+  const isCash = myParticipant?.paymentMethod === "CASH";
 
   return (
     <div className="space-y-4">
@@ -175,46 +191,76 @@ export default function GameDetailPage() {
         </div>
       </Card>
 
-      {/* Кнопки записи */}
+      {/* Кнопки действий */}
+      {game.status === "FULL" && !isParticipant && (
+        <div className="space-y-2">
+          {inWaitlist ? (
+            <Card className="text-center bg-gold/10 border-gold/30">
+              <p className="text-gold font-semibold">Вы в листе ожидания</p>
+              <p className="text-text-secondary text-xs mt-1">Уведомим, когда освободится место</p>
+            </Card>
+          ) : (
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={handleJoinWaitlist}
+              disabled={joiningWaitlist}
+            >
+              {joiningWaitlist ? "..." : "Встать в лист ожидания"}
+            </Button>
+          )}
+        </div>
+      )}
+
       {game.status === "OPEN" && !isParticipant && (
-        <div className="space-y-3">
+        <div className="space-y-2">
           <Button
             className="w-full"
             size="lg"
             onClick={handlePayOnline}
-            disabled={paymentLoading || registering}
+            disabled={paying}
           >
-            {paymentLoading ? "Создаём платёж..." : `Оплатить онлайн — ${(game.price / 100).toLocaleString("ru-RU")} ₽`}
+            {paying ? "Оформление..." : "Оплатить онлайн"}
           </Button>
           <Button
-            variant="secondary"
-            className="w-full"
+            className="w-full bg-card border border-accent/30 text-accent"
             size="lg"
-            onClick={handleRegister}
-            disabled={registering || paymentLoading}
+            onClick={handleRegisterCash}
+            disabled={registering}
           >
-            {registering ? "Записываем..." : "Оплатить на месте"}
+            {registering ? "Запись..." : "Записаться, оплачу на месте"}
           </Button>
           <p className="text-text-secondary text-xs text-center">
-            При оплате на месте — ожидайте подтверждения от организатора
+            При оплате наличными запись ожидает подтверждения администратора
           </p>
         </div>
       )}
-      {isParticipant && game.status !== "FINISHED" && (
-        <>
-          <Card className="text-center bg-success/10 border-success/30">
-            <p className="text-success font-semibold">Вы записаны на эту игру</p>
-            <p className="text-text-secondary text-xs mt-1">Ожидайте подтверждения от организатора</p>
-          </Card>
-          <Button
-            variant="secondary"
-            className="w-full"
-            onClick={handleCancel}
-            disabled={registering}
-          >
-            {registering ? "..." : "Отменить запись"}
-          </Button>
-        </>
+
+      {isParticipant && (
+        <div className="space-y-2">
+          {isConfirmed ? (
+            <Card className="text-center bg-success/10 border-success/30">
+              <p className="text-success font-semibold">Вы записаны на эту игру</p>
+            </Card>
+          ) : isCash ? (
+            <Card className="text-center bg-gold/10 border-gold/30">
+              <p className="text-gold font-semibold">Запись ожидает подтверждения</p>
+              <p className="text-text-secondary text-xs mt-1">Администратор подтвердит вашу запись</p>
+            </Card>
+          ) : (
+            <Card className="text-center bg-accent/10 border-accent/30">
+              <p className="text-accent font-semibold">Ожидание оплаты...</p>
+            </Card>
+          )}
+          {!isConfirmed && isCash && (
+            <button
+              onClick={handleCancel}
+              className="w-full text-danger text-sm py-2 hover:underline"
+            >
+              Отменить запись
+            </button>
+          )}
+        </div>
       )}
 
       {/* Участники */}
@@ -245,11 +291,12 @@ export default function GameDetailPage() {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                {p.confirmed ? (
-                  <span className="text-success text-xs font-semibold">Оплачен</span>
-                ) : (
-                  <span className="text-gold text-xs font-semibold">Ожидает</span>
+              <div className="text-right">
+                <p className="text-gold text-sm font-bold">
+                  {p.user.totalPoints} б.
+                </p>
+                {!p.confirmed && (
+                  <p className="text-text-secondary text-xs">ожидание</p>
                 )}
               </div>
             </Card>

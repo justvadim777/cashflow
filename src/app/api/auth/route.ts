@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateInitData } from "@/lib/telegram/validate";
 import { prisma } from "@/lib/db";
+import { getRoleByTelegramId } from "@/lib/telegram/roles";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { audit } from "@/lib/audit";
 import crypto from "crypto";
-import type { UserRole } from "@/generated/prisma/client";
-
-// Telegram ID → роль при регистрации
-const ADMIN_IDS: Record<string, UserRole> = {
-  "616176317": "ADMIN",
-  "5712505670": "ADMIN",
-};
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -21,6 +17,11 @@ export async function POST(req: NextRequest) {
   const { user: tgUser, startParam } = initData;
   const telegramId = BigInt(tgUser.id);
 
+  const rl = checkRateLimit(`auth:${telegramId}`);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   let user = await prisma.user.findUnique({
     where: { telegramId },
   });
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
       .join(" ");
 
     const referralCode = crypto.randomBytes(4).toString("hex");
-    const assignedRole = ADMIN_IDS[tgUser.id.toString()] || "PLAYER";
+    const role = getRoleByTelegramId(telegramId);
 
     let referredById: string | undefined;
     if (startParam?.startsWith("ref_")) {
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    await audit("ROLE_CHANGE", telegramId, `new user ${telegramId}`, { role });
     user = await prisma.user.create({
       data: {
         telegramId,
@@ -52,19 +54,26 @@ export async function POST(req: NextRequest) {
         avatarUrl: tgUser.photo_url || null,
         referralCode,
         referredById,
-        role: assignedRole,
+        role,
       },
     });
   } else {
-    // Пользователь уже есть — проверяем обновления
-    const updates: { role?: UserRole; referredById?: string } = {};
+    const updates: {
+      role?: ReturnType<typeof getRoleByTelegramId>;
+      referredById?: string;
+      username?: string | null;
+      displayName?: string;
+      avatarUrl?: string | null;
+    } = {};
 
-    // Обновить роль, если админский ID и ещё PLAYER
-    if (ADMIN_IDS[tgUser.id.toString()] && user.role === "PLAYER") {
-      updates.role = ADMIN_IDS[tgUser.id.toString()];
+    // Повысить роль если env-конфиг указывает на более высокую
+    const envRole = getRoleByTelegramId(telegramId);
+    const roleOrder: Record<string, number> = { PLAYER: 0, HOST: 1, ADMIN: 2, OWNER: 3 };
+    if (roleOrder[envRole] > roleOrder[user.role]) {
+      updates.role = envRole;
     }
 
-    // Привязать реферала, если ещё не привязан и есть startParam
+    // Привязать реферала если ещё не привязан и есть startParam
     if (!user.referredById && startParam?.startsWith("ref_")) {
       const code = startParam.replace("ref_", "");
       const referrer = await prisma.user.findUnique({
@@ -74,6 +83,16 @@ export async function POST(req: NextRequest) {
         updates.referredById = referrer.id;
       }
     }
+
+    // Синхронизировать актуальные Telegram-данные
+    const freshDisplayName =
+      [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") || user.displayName;
+    const freshUsername = tgUser.username ?? null;
+    const freshAvatar = tgUser.photo_url ?? null;
+
+    if (user.username !== freshUsername) updates.username = freshUsername;
+    if (user.displayName !== freshDisplayName) updates.displayName = freshDisplayName;
+    if (freshAvatar && user.avatarUrl !== freshAvatar) updates.avatarUrl = freshAvatar;
 
     if (Object.keys(updates).length > 0) {
       user = await prisma.user.update({

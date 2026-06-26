@@ -1,11 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { sendNotification } from "@/lib/notifications/bot";
+import { isYukassaIp } from "@/lib/payments/yukassa-ips";
+import { verifyWebhookSignature, refundPayment } from "@/lib/payments/yukassa";
+import { tryIncrementPlayers } from "@/lib/games/atomic-join";
 import { checkGameAchievements, checkReferralAchievement } from "@/lib/achievements/check";
 import { sendNotification } from "@/lib/notifications/bot";
 
 // POST /api/payments/webhook — ЮКасса webhook
 export async function POST(req: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      req.headers.get("x-real-ip") ??
+      "";
+    if (!isYukassaIp(ip)) {
+      return NextResponse.json({ error: "Forbidden IP" }, { status: 403 });
+    }
+  }
+
   const body = await req.text();
+
+  const signature = req.headers.get("Signature") ?? "";
+  if (process.env.YUKASSA_WEBHOOK_SECRET && !verifyWebhookSignature(body, signature)) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+  }
+
   let event: {
     type: string;
     event: string;
@@ -33,47 +53,62 @@ export async function POST(req: NextRequest) {
 
   const { paymentId, userId, gameId } = metadata;
 
-  // Идемпотентность: проверяем что платёж ещё PENDING
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
   if (!payment || payment.status !== "PENDING") {
     return NextResponse.json({ ok: true });
   }
 
+  const existingParticipant = await prisma.gameParticipant.findUnique({
+    where: { gameId_userId: { gameId, userId } },
+  });
+
+  if (!existingParticipant) {
+    const captured = await tryIncrementPlayers(gameId);
+    if (!captured) {
+      await prisma.payment.update({
+        where: { id: paymentId },
+        data: { status: "FAILED", providerPaymentId: event.object.id },
+      });
+      try {
+        await refundPayment(event.object.id, payment.amount);
+      } catch (err) {
+        console.error("Auto-refund failed:", err);
+      }
+      return NextResponse.json({ ok: true });
+    }
+  }
+
+  let referrerId: string | null = null;
+  let referralAmount = 0;
+
   await prisma.$transaction(async (tx) => {
-    // Обновить статус платежа
     await tx.payment.update({
       where: { id: paymentId },
       data: { status: "SUCCESS", providerPaymentId: event.object.id },
     });
 
-    // Добавить участника в игру (онлайн-оплата = сразу подтверждён)
-    await tx.gameParticipant.create({
-      data: {
-        gameId,
-        userId,
-        paymentId,
-        confirmed: true,
-      },
-    });
-
-    // Увеличить счётчик игроков
-    const game = await tx.game.update({
-      where: { id: gameId },
-      data: { playersCount: { increment: 1 } },
-    });
-
-    // Если игра заполнена — сменить статус
-    if (game.playersCount >= game.playersLimit) {
-      await tx.game.update({
-        where: { id: gameId },
-        data: { status: "FULL" },
+    if (!existingParticipant) {
+      await tx.gameParticipant.create({
+        data: {
+          gameId,
+          userId,
+          paymentId,
+          paymentMethod: "YUKASSA",
+          confirmed: true,
+        },
+      });
+    } else {
+      await tx.gameParticipant.update({
+        where: { gameId_userId: { gameId, userId } },
+        data: { paymentId, paymentMethod: "YUKASSA", confirmed: true },
       });
     }
 
-    // Реферальное начисление (15%)
+    // Реферальное начисление (15%) только для YUKASSA
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (user?.referredById) {
-      const referralAmount = Math.round(payment.amount * 0.15);
+      referrerId = user.referredById;
+      referralAmount = Math.round(payment.amount * 0.15);
       await tx.referral.create({
         data: {
           referrerId: user.referredById,
@@ -90,38 +125,21 @@ export async function POST(req: NextRequest) {
     }
   });
 
-  // Проверить достижения после оплаты
-  await checkGameAchievements(userId);
-
-  // Проверить реферальное достижение
-  const paidUser = await prisma.user.findUnique({ where: { id: userId } });
-  if (paidUser?.referredById) {
-    await checkReferralAchievement(paidUser.referredById);
-  }
-
-  // Уведомить игрока об успешной оплате
-  const gameForNotify = await prisma.game.findUnique({ where: { id: gameId } });
-  if (paidUser && gameForNotify) {
-    const gameDate = new Date(gameForNotify.date).toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "long",
-    });
-    await sendNotification(
-      paidUser.telegramId,
-      `✅ <b>Оплата прошла!</b>\n\nТы в списке игроков на игру <b>${gameDate}</b> в <b>${gameForNotify.time}</b>.\n\nЖдём в Остров Lounge!`
-    );
-
-    // Уведомить админов об онлайн-оплате
-    const admins = await prisma.user.findMany({
-      where: { role: { in: ["ADMIN", "OWNER"] } },
-      select: { telegramId: true },
-    });
-    const userInfo = paidUser.username ? `@${paidUser.username}` : paidUser.displayName;
-    const adminText = `💳 <b>Онлайн-оплата получена</b>\n\n${paidUser.displayName} (${userInfo}) оплатил игру <b>${gameDate}</b> в <b>${gameForNotify.time}</b>.\n\n✅ Участник автоматически подтверждён.`;
-    for (const admin of admins) {
-      await sendNotification(admin.telegramId, adminText);
+  // Уведомить реферёра вне транзакции
+  if (referrerId && referralAmount > 0) {
+    const referrer = await prisma.user.findUnique({ where: { id: referrerId } });
+    if (referrer) {
+      const rubles = (referralAmount / 100).toLocaleString("ru-RU");
+      await sendNotification(
+        referrer.telegramId,
+        `🤝 <b>Реферальный бонус!</b>\n\nТебе начислено <b>${rubles} ₽</b>`
+      );
+      await checkReferralAchievement(referrer.id);
     }
   }
+
+  // Проверить достижения
+  await checkGameAchievements(userId);
 
   return NextResponse.json({ ok: true });
 }

@@ -1,36 +1,166 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cashflow — Telegram Mini App
 
-## Getting Started
+Система записи, оплаты и рейтинга игр «Денежный поток» для заведения «Остров Lounge».
 
-First, run the development server:
+**Стек:** Next.js 16 App Router · TypeScript strict · Prisma 7 · PostgreSQL · grammy · ЮКасса · Tailwind CSS v4 · Zustand
+
+---
+
+## Быстрый старт (локально)
+
+### Требования
+- Node.js 20+
+- PostgreSQL 16+
+- Doppler CLI (для env vars) или `.env` файл
+
+### Установка
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repo>
+cd cashflow
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Настройка окружения
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Скопируй `.env.example` в `.env` и заполни переменные:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cp .env.example .env
+```
 
-## Learn More
+Ключевые переменные:
+- `DATABASE_URL` — подключение к PostgreSQL
+- `TELEGRAM_BOT_TOKEN` — токен бота из @BotFather
+- `TELEGRAM_BOT_SECRET` — секрет для webhook (любая строка)
+- `NEXTAUTH_SECRET` — секрет сессий (генерировать: `openssl rand -hex 32`)
+- `ADMIN_TELEGRAM_IDS` — telegram_id администраторов через запятую
 
-To learn more about Next.js, take a look at the following resources:
+### Миграции и запуск
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npx prisma migrate dev    # применить миграции
+npx prisma generate       # сгенерировать клиент
+npm run dev               # запустить dev-сервер (с doppler)
+# или без doppler:
+npx next dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Локальный бот (polling)
 
-## Deploy on Vercel
+```bash
+npm run bot
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Деплой на VPS (Ubuntu 22/24)
+
+### 1. Первоначальная настройка
+
+```bash
+bash deploy/setup.sh your-domain.com
+```
+
+Скрипт установит: Node.js 20, PostgreSQL, Nginx + SSL (certbot), создаст systemd-сервис `cashflow.service`, настроит crontab.
+
+### 2. Заполни `.env.production`
+
+```bash
+nano /opt/cashflow/.env.production
+```
+
+### 3. Деплой обновлений
+
+```bash
+bash /opt/cashflow/deploy/deploy.sh
+```
+
+Скрипт выполнит: `npm ci` → `prisma generate` → `prisma migrate deploy` → `next build` → restart сервиса → set webhook.
+
+---
+
+## Команды бота
+
+| Команда | Описание |
+|---------|---------|
+| `/start` | Начать работу |
+| `/games` | Ближайшие игры |
+| `/profile` | Мой профиль |
+| `/leaderboard` | Рейтинг |
+| `/referral` | Реферальная программа |
+| `/info` | О проекте |
+| `/help` | Список команд |
+
+---
+
+## Роли
+
+| Роль | Доступ |
+|------|--------|
+| PLAYER | Dashboard, игры, профиль, рейтинг, рефералка |
+| HOST | + Создание игр, ввод результатов (только своих игр) |
+| ADMIN | Полный доступ + управление юзерами, подтверждение CASH-записей |
+| OWNER | Финансы + аналитика (read-only) |
+
+Роли задаются в `.env`:
+```
+ADMIN_TELEGRAM_IDS=123456,789012
+OWNER_TELEGRAM_IDS=111111
+HOST_TELEGRAM_IDS=222222,333333
+```
+
+---
+
+## API роуты
+
+### Публичные (с Telegram auth)
+- `POST /api/auth` — авторизация через initData
+- `GET /api/games` — список игр
+- `GET /api/games/[id]` — детали игры
+- `POST /api/games/[id]/register` — запись (CASH)
+- `DELETE /api/games/[id]/register` — отмена записи
+- `POST /api/games/[id]/refund` — заявка на возврат
+- `POST /api/games/[id]/waitlist` — встать в очередь
+- `DELETE /api/games/[id]/waitlist` — выйти из очереди
+- `POST /api/payments` — создать платёж ЮКасса
+- `GET /api/leaderboard` — рейтинг
+- `GET /api/referral` — данные рефералки
+- `POST /api/referral/withdraw` — заявка на вывод
+
+### Для HOST/ADMIN
+- `POST /api/games` — создать игру
+- `PATCH /api/games/[id]` — обновить игру
+- `POST /api/results` — сохранить результат
+- `PATCH /api/games/[id]/confirm` — подтвердить/отклонить CASH-запись
+
+### Для ADMIN/OWNER
+- `GET /api/analytics` — аналитика
+- `GET /api/admin/refunds/all` — список возвратов
+- `PATCH /api/admin/refunds/[id]` — обновить статус возврата
+- `GET /api/admin/cash-participants` — CASH-записи
+
+### Cron (Bearer NEXTAUTH_SECRET)
+- `POST /api/cron/notify-upcoming` — напоминания 48ч/24ч/2ч
+- `POST /api/cron/cleanup-pending` — очистка PENDING >30мин
+- `POST /api/cron/finish-games` — завершение прошедших игр
+- `POST /api/cron/expire-waitlist` — истечение очереди
+
+### Webhooks
+- `POST /api/payments/webhook` — ЮКасса (IP whitelist + опциональная подпись)
+- `POST /api/bot` — Telegram Bot webhook
+
+---
+
+## Тесты
+
+```bash
+npm test              # vitest run
+npm run test -- --ui  # UI интерфейс
+```
+
+---
+
+## Восстановление БД
+
+Смотри [deploy/RESTORE.md](deploy/RESTORE.md).

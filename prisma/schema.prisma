@@ -55,6 +55,11 @@ enum AchievementType {
   FIRST_REFERRAL
 }
 
+enum PaymentMethod {
+  YUKASSA
+  CASH
+}
+
 // ============ Models ============
 
 model User {
@@ -77,14 +82,16 @@ model User {
 
   createdAt      DateTime @default(now()) @map("created_at")
 
-  participations GameParticipant[]
-  payments       Payment[]
-  gameResults    GameResult[]
-  referralsMade  Referral[]          @relation("ReferralsMade")
-  referralsReceived Referral[]       @relation("ReferralsReceived")
-  withdrawals    WithdrawalRequest[]
-  achievements   Achievement[]
-  createdGames   Game[]
+  participations  GameParticipant[]
+  payments        Payment[]
+  gameResults     GameResult[]
+  referralsMade   Referral[]          @relation("ReferralsMade")
+  referralsReceived Referral[]        @relation("ReferralsReceived")
+  withdrawals     WithdrawalRequest[]
+  achievements    Achievement[]
+  createdGames    Game[]
+  refundRequests  RefundRequest[]
+  waitlists       GameWaitlist[]
 
   @@map("users")
 }
@@ -104,24 +111,28 @@ model Game {
   createdBy    User       @relation(fields: [createdById], references: [id])
   createdAt    DateTime   @default(now()) @map("created_at")
 
-  participants GameParticipant[]
-  payments     Payment[]
-  results      GameResult[]
-  referrals    Referral[]
+  participants   GameParticipant[]
+  payments       Payment[]
+  results        GameResult[]
+  referrals      Referral[]
+  refundRequests RefundRequest[]
+  waitlists      GameWaitlist[]
 
   @@map("games")
 }
 
 model GameParticipant {
-  id        String   @id @default(cuid())
-  gameId    String   @map("game_id")
-  game      Game     @relation(fields: [gameId], references: [id])
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id])
-  paymentId String?  @unique @map("payment_id")
-  payment   Payment? @relation(fields: [paymentId], references: [id])
-  confirmed Boolean  @default(false)
-  joinedAt  DateTime @default(now()) @map("joined_at")
+  id            String        @id @default(cuid())
+  gameId        String        @map("game_id")
+  game          Game          @relation(fields: [gameId], references: [id])
+  userId        String        @map("user_id")
+  user          User          @relation(fields: [userId], references: [id])
+  paymentId     String?       @unique @map("payment_id")
+  payment       Payment?      @relation(fields: [paymentId], references: [id])
+  paymentMethod    PaymentMethod @default(YUKASSA) @map("payment_method")
+  confirmed        Boolean       @default(false)
+  manualPaidAmount Int?          @map("manual_paid_amount")
+  joinedAt         DateTime      @default(now()) @map("joined_at")
 
   @@unique([gameId, userId])
   @@map("game_participants")
@@ -138,7 +149,8 @@ model Payment {
   providerPaymentId String?       @map("provider_payment_id")
   createdAt         DateTime      @default(now()) @map("created_at")
 
-  participant       GameParticipant?
+  participant    GameParticipant?
+  refundRequests RefundRequest[]
 
   @@map("payments")
 }
@@ -220,4 +232,56 @@ model Achievement {
 
   @@unique([userId, type])
   @@map("achievements")
+}
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  actorTelegramId BigInt   @map("actor_telegram_id")
+  action          String
+  target          String?
+  payload         Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
+model GameWaitlist {
+  id         String    @id @default(cuid())
+  gameId     String    @map("game_id")
+  game       Game      @relation(fields: [gameId], references: [id])
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id])
+  joinedAt   DateTime  @default(now()) @map("joined_at")
+  notifiedAt DateTime? @map("notified_at")
+
+  @@unique([gameId, userId])
+  @@map("game_waitlists")
+}
+
+model NotificationLog {
+  id     String   @id @default(cuid())
+  userId String   @map("user_id")
+  gameId String   @map("game_id")
+  type   String   // 'PRE_48H' | 'PRE_24H' | 'PRE_2H' | 'POST_GAME' | 'LEVEL_UP' | 'INACTIVE_30D'
+  sentAt DateTime @default(now()) @map("sent_at")
+
+  @@unique([userId, gameId, type])
+  @@map("notification_logs")
+}
+
+model RefundRequest {
+  id          String           @id @default(cuid())
+  userId      String           @map("user_id")
+  user        User             @relation(fields: [userId], references: [id])
+  gameId      String           @map("game_id")
+  game        Game             @relation(fields: [gameId], references: [id])
+  paymentId   String           @map("payment_id")
+  payment     Payment          @relation(fields: [paymentId], references: [id])
+  amount      Int
+  reason      String?
+  status      WithdrawalStatus @default(CREATED)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  processedAt DateTime?        @map("processed_at")
+
+  @@map("refund_requests")
 }

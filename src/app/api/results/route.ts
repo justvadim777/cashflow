@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/telegram";
 import { prisma } from "@/lib/db";
-import { calculateTotalPoints, calculateLevel } from "@/lib/points/calculate";
+import { calculateTotalPoints, recalcUserStatsAfterResult, getLevelName } from "@/lib/points/calculate";
 import type { ResultInput } from "@/lib/points/calculate";
 import { checkGameAchievements } from "@/lib/achievements/check";
+import { sendNotification, sendNotificationWithButton } from "@/lib/notifications/bot";
+import { NOTIFICATION_TEMPLATES } from "@/lib/notifications/templates";
+import { audit } from "@/lib/audit";
 
 // POST /api/results — ввод результатов (HOST / ADMIN)
 export async function POST(req: NextRequest) {
@@ -19,7 +22,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing gameId or userId" }, { status: 400 });
     }
 
-    // Ведущий видит только свои игры
     if (user.role === "HOST") {
       const game = await prisma.game.findUnique({ where: { id: gameId } });
       if (!game || game.createdById !== user.id) {
@@ -27,7 +29,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Проверка: участник в игре
     const participant = await prisma.gameParticipant.findUnique({
       where: { gameId_userId: { gameId, userId } },
     });
@@ -61,99 +62,44 @@ export async function POST(req: NextRequest) {
     const totalPoints = calculateTotalPoints(resultInput);
     const hookahRevenue = scores.hookahRevenue || 0;
 
+    await audit("GAME_RESULT_SAVE", user.telegramId, `game:${gameId} user:${userId}`, { totalPoints });
+
     const result = await prisma.gameResult.upsert({
       where: { gameId_userId: { gameId, userId } },
-      create: {
-        gameId,
-        userId,
-        ...resultInput,
-        totalPoints,
-        hookahRevenue,
-      },
-      update: {
-        ...resultInput,
-        totalPoints,
-        hookahRevenue,
-      },
+      create: { gameId, userId, ...resultInput, totalPoints, hookahRevenue },
+      update: { ...resultInput, totalPoints, hookahRevenue },
     });
 
-    // Пересчитать общие баллы пользователя
-    const allResults = await prisma.gameResult.findMany({
-      where: { userId },
-      select: { totalPoints: true },
-    });
-    const userTotalPoints = allResults.reduce((sum: number, r: { totalPoints: number }) => sum + r.totalPoints, 0);
-    const newLevel = calculateLevel(userTotalPoints);
+    const { totalPoints: userTotal, newLevel, levelUp } = await recalcUserStatsAfterResult(userId);
 
-    // Пересчитать месячные баллы (результаты текущего месяца)
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+    const rank =
+      (await prisma.user.count({ where: { totalPoints: { gt: userTotal } } })) + 1;
 
-    const monthlyResults = await prisma.gameResult.findMany({
-      where: {
-        userId,
-        game: { date: { gte: monthStart } },
-      },
-      select: { totalPoints: true },
-    });
-    const userMonthlyPoints = monthlyResults.reduce(
-      (sum: number, r: { totalPoints: number }) => sum + r.totalPoints,
-      0
-    );
-
-    const previousUser = await prisma.user.findUnique({ where: { id: userId } });
-    const previousLevel = previousUser?.level;
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        totalPoints: userTotalPoints,
-        monthlyPoints: userMonthlyPoints,
-        level: newLevel,
-      },
-    });
-
-    const { sendNotification, sendNotificationWithButton } = await import("@/lib/notifications/bot");
-    const { NOTIFICATION_TEMPLATES } = await import("@/lib/notifications/templates");
-    const levelLabels: Record<string, string> = {
-      NEWBIE: "Новичок",
-      PLAYER: "Игрок",
-      INVESTOR: "Инвестор",
-      CAPITALIST: "Капиталист",
-    };
-
-    // Позиция в рейтинге
-    const rank = await prisma.user.count({
-      where: { totalPoints: { gt: userTotalPoints } },
-    }) + 1;
-
-    // Уведомление с результатом игры
-    if (previousUser) {
-      let message = NOTIFICATION_TEMPLATES.GAME_RESULT(
-        totalPoints,
-        rank,
-        levelLabels[newLevel] || newLevel
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (targetUser) {
+      await sendNotification(
+        targetUser.telegramId,
+        NOTIFICATION_TEMPLATES.GAME_RESULT(totalPoints, rank, getLevelName(newLevel))
       );
 
-      // Смена уровня
-      if (previousLevel && previousLevel !== newLevel) {
-        message += `\n\n${NOTIFICATION_TEMPLATES.LEVEL_UP(levelLabels[newLevel] || newLevel)}`;
+      if (levelUp) {
+        await sendNotification(
+          targetUser.telegramId,
+          NOTIFICATION_TEMPLATES.LEVEL_UP(getLevelName(newLevel))
+        );
       }
-
-      await sendNotification(previousUser.telegramId, message);
     }
 
     // Upsell: после первой BASE игры → предложить MAIN
     const game = await prisma.game.findUnique({ where: { id: gameId } });
-    if (game?.type === "BASE" && previousUser) {
+    if (game?.type === "BASE" && targetUser) {
       const baseGamesCount = await prisma.gameResult.count({
         where: { userId, game: { type: "BASE" } },
       });
       if (baseGamesCount === 1) {
         const appUrl = process.env.NEXT_PUBLIC_TG_APP_URL || "";
         await sendNotificationWithButton(
-          previousUser.telegramId,
+          targetUser.telegramId,
           NOTIFICATION_TEMPLATES.UPSELL_MAIN(),
           "Записаться в Продвинутую",
           `${appUrl}/games`
@@ -161,9 +107,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Проверить достижения после обновления результатов
-    await checkGameAchievements(userId);
+    const newAchievements = await checkGameAchievements(userId);
 
-    return NextResponse.json({ result, userTotalPoints, newLevel });
+    return NextResponse.json({ result, userTotalPoints: userTotal, newLevel, rank, newAchievements });
   });
 }

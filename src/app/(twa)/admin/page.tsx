@@ -6,24 +6,15 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 
-interface Participant {
-  id: string;
-  confirmed: boolean;
-  user: {
-    id: string;
-    displayName: string;
-    username: string | null;
-    telegramId: string;
-  };
-}
-
 interface GameForResults {
   id: string;
   date: string;
   time: string;
   type: string;
   status: string;
-  participants: Participant[];
+  participants: {
+    user: { id: string; displayName: string };
+  }[];
 }
 
 const SKILL_FIELDS = [
@@ -39,38 +30,55 @@ const SKILL_FIELDS = [
   { key: "skillEngagement", label: "Вовлечённость" },
 ] as const;
 
-const GAME_POINT_TOGGLES = [
-  { key: "pointsExitRatRace", label: "Выход из крысиных бегов", points: 10 },
-  { key: "pointsLiabilities", label: "Пассивы закрыты", points: 5 },
-  { key: "pointsDream", label: "Мечта куплена", points: 10 },
-  { key: "pointsBestIncome", label: "Лучший доход", points: 10 },
+const GAME_POINT_FIELDS = [
+  { key: "pointsExitRatRace", label: "Выход из крысиных бегов (+10)" },
+  { key: "pointsLiabilities", label: "Пассивы закрыты (+5)" },
+  { key: "pointsDream", label: "Мечта куплена (+10)" },
+  { key: "pointsBestIncome", label: "Лучший доход (+10)" },
+  { key: "pointsIncomeGrowth", label: "Рост дохода (+5/50k)" },
 ] as const;
 
 const EXTRA_POINT_FIELDS = [
-  { key: "pointsSecret", label: "Секретный балл", points: 5 },
-  { key: "pointsOrder", label: "Заказ в заведении", points: 10 },
-  { key: "pointsSubscription", label: "Подписка", points: 5 },
-  { key: "pointsVideoReview", label: "Видео-отзыв", points: 5 },
-  { key: "pointsStories", label: "Сторис", points: 5 },
+  { key: "pointsSecret", label: "Секретный балл (+5)" },
+  { key: "pointsOrder", label: "Заказ в заведении (+10)" },
+  { key: "pointsSubscription", label: "Подписка (+5)" },
+  { key: "pointsVideoReview", label: "Видео-отзыв (+5)" },
+  { key: "pointsStories", label: "Сторис (+5)" },
 ] as const;
 
-const TYPE_LABELS: Record<string, string> = {
-  BASE: "Базовая",
-  MAIN: "Продвинутая",
-};
+interface CashParticipant {
+  userId: string;
+  confirmed: boolean;
+  paymentMethod: string;
+  joinedAt: string;
+  user: { displayName: string; username: string | null };
+  game: { id: string; date: string; time: string; price: number };
+}
 
-type Tab = "participants" | "results" | "games" | "analytics";
+interface RefundRequest {
+  id: string;
+  amount: number;
+  reason: string | null;
+  status: "CREATED" | "PROCESSING" | "DONE";
+  createdAt: string;
+  user: { displayName: string };
+  game: { date: string; time: string };
+}
+
+type Tab = "results" | "analytics" | "games" | "refunds" | "cash";
 
 export default function AdminPage() {
   const { role } = useUserStore();
-  const [tab, setTab] = useState<Tab>("participants");
-  const [confirming, setConfirming] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("results");
   const [games, setGames] = useState<GameForResults[]>([]);
   const [selectedGame, setSelectedGame] = useState<string>("");
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
   const [scores, setScores] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [analytics, setAnalytics] = useState<Record<string, unknown> | null>(null);
+  const [refunds, setRefunds] = useState<RefundRequest[]>([]);
+  const [cashParticipants, setCashParticipants] = useState<CashParticipant[]>([]);
+  const [cashAmounts, setCashAmounts] = useState<Record<string, number>>({});
 
   // Создание игры
   const [newGame, setNewGame] = useState({
@@ -104,6 +112,12 @@ export default function AdminPage() {
     if (isAdmin || isOwner) {
       api<Record<string, unknown>>("/analytics")
         .then(setAnalytics)
+        .catch(() => {});
+      api<{ refunds: RefundRequest[] }>("/admin/refunds/all")
+        .then((d) => setRefunds(d.refunds))
+        .catch(() => {});
+      api<{ participants: CashParticipant[] }>("/admin/cash-participants")
+        .then((d) => setCashParticipants(d.participants))
         .catch(() => {});
     }
   }, [isAdmin, isHost, isOwner]);
@@ -139,22 +153,6 @@ export default function AdminPage() {
     setSaving(false);
   }
 
-  async function handleParticipant(gameId: string, participantId: string, action: "confirm" | "reject") {
-    setConfirming(participantId);
-    try {
-      await api(`/games/${gameId}/confirm`, {
-        method: "PATCH",
-        body: JSON.stringify({ participantId, action }),
-      });
-      // Перезагрузить список игр
-      const data = await api<{ games: GameForResults[] }>("/games?status=active");
-      setGames(data.games);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка");
-    }
-    setConfirming(null);
-  }
-
   async function createGame() {
     try {
       await api("/games", {
@@ -176,16 +174,6 @@ export default function AdminPage() {
       <div className="flex gap-1 bg-card rounded-xl p-1">
         {(isAdmin || isHost) && (
           <button
-            onClick={() => setTab("participants")}
-            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
-              tab === "participants" ? "bg-accent text-white" : "text-text-secondary"
-            }`}
-          >
-            Заявки
-          </button>
-        )}
-        {(isAdmin || isHost) && (
-          <button
             onClick={() => setTab("results")}
             className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
               tab === "results" ? "bg-accent text-white" : "text-text-secondary"
@@ -201,7 +189,7 @@ export default function AdminPage() {
               tab === "games" ? "bg-accent text-white" : "text-text-secondary"
             }`}
           >
-            Создать
+            Создать игру
           </button>
         )}
         {(isAdmin || isOwner) && (
@@ -214,122 +202,27 @@ export default function AdminPage() {
             Аналитика
           </button>
         )}
+        {(isAdmin || isHost) && (
+          <button
+            onClick={() => setTab("cash")}
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
+              tab === "cash" ? "bg-accent text-white" : "text-text-secondary"
+            }`}
+          >
+            Наличные
+          </button>
+        )}
+        {(isAdmin || isOwner) && (
+          <button
+            onClick={() => setTab("refunds")}
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
+              tab === "refunds" ? "bg-accent text-white" : "text-text-secondary"
+            }`}
+          >
+            Возвраты
+          </button>
+        )}
       </div>
-
-      {/* Participants tab */}
-      {tab === "participants" && (
-        <div className="space-y-4">
-          {games.length === 0 ? (
-            <Card className="text-center py-8">
-              <p className="text-text-secondary">Нет активных игр</p>
-            </Card>
-          ) : (
-            games.map((game) => {
-              const pending = game.participants.filter((p) => !p.confirmed);
-              const confirmed = game.participants.filter((p) => p.confirmed);
-
-              return (
-                <Card key={game.id} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold">
-                        {new Date(game.date).toLocaleDateString("ru-RU", {
-                          day: "numeric",
-                          month: "long",
-                        })}{" "}
-                        в {game.time}
-                      </p>
-                      <p className="text-text-secondary text-xs">{TYPE_LABELS[game.type] || game.type}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs text-text-secondary">
-                        {confirmed.length} подтв. / {game.participants.length} всего
-                      </span>
-                    </div>
-                  </div>
-
-                  {pending.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-gold text-xs font-semibold">Ожидают оплаты:</p>
-                      {pending.map((p) => (
-                        <div
-                          key={p.id}
-                          className="flex items-center gap-3 bg-bg rounded-xl px-3 py-2"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm truncate">
-                              {p.user.displayName}
-                            </p>
-                            {p.user.username && (
-                              <a
-                                href={`https://t.me/${p.user.username}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-accent text-xs hover:underline"
-                              >
-                                @{p.user.username}
-                              </a>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleParticipant(game.id, p.id, "confirm")}
-                              disabled={confirming === p.id}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-success/20 text-success hover:bg-success/30 transition-colors disabled:opacity-50"
-                            >
-                              {confirming === p.id ? "..." : "Оплатил"}
-                            </button>
-                            <button
-                              onClick={() => handleParticipant(game.id, p.id, "reject")}
-                              disabled={confirming === p.id}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-danger/20 text-danger hover:bg-danger/30 transition-colors disabled:opacity-50"
-                            >
-                              Отмена
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {confirmed.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-success text-xs font-semibold">Подтверждены:</p>
-                      {confirmed.map((p) => (
-                        <div
-                          key={p.id}
-                          className="flex items-center gap-3 bg-bg rounded-xl px-3 py-2"
-                        >
-                          <div className="text-sm truncate flex-1">
-                            {p.user.displayName}
-                            {p.user.username && (
-                              <a
-                                href={`https://t.me/${p.user.username}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-accent text-xs ml-1 hover:underline"
-                              >
-                                @{p.user.username}
-                              </a>
-                            )}
-                          </div>
-                          <span className="text-success text-xs">✓</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {game.participants.length === 0 && (
-                    <p className="text-text-secondary text-sm text-center py-2">
-                      Пока никто не записался
-                    </p>
-                  )}
-                </Card>
-              );
-            })
-          )}
-        </div>
-      )}
 
       {/* Results tab */}
       {tab === "results" && (
@@ -347,7 +240,7 @@ export default function AdminPage() {
               <option value="">Выберите игру</option>
               {games.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {new Date(g.date).toLocaleDateString("ru-RU")} {g.time} — {TYPE_LABELS[g.type] || g.type}
+                  {new Date(g.date).toLocaleDateString("ru-RU")} {g.time} — {g.type}
                 </option>
               ))}
             </select>
@@ -375,155 +268,62 @@ export default function AdminPage() {
             <>
               <Card>
                 <h3 className="font-semibold mb-3">Навыки (1-10)</h3>
-                <div className="space-y-4">
-                  {SKILL_FIELDS.map(({ key, label }) => {
-                    const value = scores[key] || 0;
-                    return (
-                      <div key={key}>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-sm">{label}</label>
-                          <span className={`text-sm font-bold ${value > 0 ? "text-accent" : "text-text-secondary"}`}>
-                            {value}
-                          </span>
-                        </div>
-                        <div className="flex gap-1">
-                          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                            <button
-                              key={n}
-                              type="button"
-                              onClick={() => setScores({ ...scores, [key]: n })}
-                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                                n <= value
-                                  ? "bg-accent text-white"
-                                  : "bg-bg border border-border text-text-secondary"
-                              }`}
-                            >
-                              {n}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="space-y-2">
+                  {SKILL_FIELDS.map(({ key, label }) => (
+                    <div key={key} className="flex items-center gap-3">
+                      <label className="flex-1 text-sm">{label}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={scores[key] || 0}
+                        onChange={(e) =>
+                          setScores({ ...scores, [key]: Number(e.target.value) })
+                        }
+                        className="w-16 bg-bg border border-border rounded-lg px-2 py-1 text-center text-white"
+                      />
+                    </div>
+                  ))}
                 </div>
               </Card>
 
               <Card>
                 <h3 className="font-semibold mb-3">Игровые баллы</h3>
-                <div className="space-y-3">
-                  {GAME_POINT_TOGGLES.map(({ key, label, points }) => {
-                    const active = (scores[key] || 0) > 0;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() =>
-                          setScores({ ...scores, [key]: active ? 0 : points })
+                <div className="space-y-2">
+                  {GAME_POINT_FIELDS.map(({ key, label }) => (
+                    <div key={key} className="flex items-center gap-3">
+                      <label className="flex-1 text-sm">{label}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={scores[key] || 0}
+                        onChange={(e) =>
+                          setScores({ ...scores, [key]: Number(e.target.value) })
                         }
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors ${
-                          active
-                            ? "bg-success/10 border-success/30 text-success"
-                            : "bg-bg border-border text-text-secondary"
-                        }`}
-                      >
-                        <span className="text-sm">{label}</span>
-                        <span className="text-xs font-bold">
-                          {active ? `+${points}` : `${points}`}
-                        </span>
-                      </button>
-                    );
-                  })}
-
-                  {/* Рост дохода — шаг +5 */}
-                  <div className="px-3 py-2.5 rounded-xl border border-border bg-bg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-text-secondary">Рост дохода (+5 за 50k)</span>
-                      <span className={`text-sm font-bold ${(scores.pointsIncomeGrowth || 0) > 0 ? "text-success" : "text-text-secondary"}`}>
-                        +{scores.pointsIncomeGrowth || 0}
-                      </span>
+                        className="w-16 bg-bg border border-border rounded-lg px-2 py-1 text-center text-white"
+                      />
                     </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setScores({ ...scores, pointsIncomeGrowth: Math.max(0, (scores.pointsIncomeGrowth || 0) - 5) })
-                        }
-                        className="w-10 h-10 rounded-xl bg-card border border-border text-white font-bold text-lg"
-                      >
-                        −
-                      </button>
-                      <div className="flex-1 flex gap-1">
-                        {[5, 10, 15, 20, 25].map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => setScores({ ...scores, pointsIncomeGrowth: n })}
-                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${
-                              (scores.pointsIncomeGrowth || 0) === n
-                                ? "bg-success text-white"
-                                : "bg-card border border-border text-text-secondary"
-                            }`}
-                          >
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setScores({ ...scores, pointsIncomeGrowth: (scores.pointsIncomeGrowth || 0) + 5 })
-                        }
-                        className="w-10 h-10 rounded-xl bg-card border border-border text-white font-bold text-lg"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </Card>
 
               <Card>
                 <h3 className="font-semibold mb-3">Дополнительные баллы</h3>
-                <div className="space-y-3">
-                  {EXTRA_POINT_FIELDS.map(({ key, label, points }) => {
-                    const active = (scores[key] || 0) > 0;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() =>
-                          setScores({ ...scores, [key]: active ? 0 : points })
+                <div className="space-y-2">
+                  {EXTRA_POINT_FIELDS.map(({ key, label }) => (
+                    <div key={key} className="flex items-center gap-3">
+                      <label className="flex-1 text-sm">{label}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={scores[key] || 0}
+                        onChange={(e) =>
+                          setScores({ ...scores, [key]: Number(e.target.value) })
                         }
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors ${
-                          active
-                            ? "bg-success/10 border-success/30 text-success"
-                            : "bg-bg border-border text-text-secondary"
-                        }`}
-                      >
-                        <span className="text-sm">{label}</span>
-                        <span className="text-xs font-bold">
-                          {active ? `+${points}` : `${points}`}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </Card>
-
-              <Card>
-                <h3 className="font-semibold mb-3">Выручка кальянки</h3>
-                <div>
-                  <label className="block text-sm text-text-secondary mb-1">Сумма заказа (₽)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={(scores.hookahRevenue || 0) / 100 || ""}
-                    onChange={(e) =>
-                      setScores({ ...scores, hookahRevenue: Math.round(Number(e.target.value) * 100) })
-                    }
-                    placeholder="0"
-                    className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-white"
-                  />
+                        className="w-16 bg-bg border border-border rounded-lg px-2 py-1 text-center text-white"
+                      />
+                    </div>
+                  ))}
                 </div>
               </Card>
 
@@ -568,8 +368,8 @@ export default function AdminPage() {
               onChange={(e) => setNewGame({ ...newGame, type: e.target.value })}
               className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-white"
             >
-              <option value="BASE">Базовая (700 ₽)</option>
-              <option value="MAIN">Продвинутая (2 000 ₽)</option>
+              <option value="BASE">BASE</option>
+              <option value="MAIN">MAIN</option>
             </select>
           </div>
           <div>
@@ -611,260 +411,194 @@ export default function AdminPage() {
         </Card>
       )}
 
+      {/* Cash registrations tab */}
+      {tab === "cash" && (
+        <div className="space-y-3">
+          <h2 className="font-semibold text-lg">CASH-записи (ожидают подтверждения)</h2>
+          {cashParticipants.filter((p) => !p.confirmed).length === 0 && (
+            <Card className="text-center text-text-secondary py-6">Нет ожидающих записей</Card>
+          )}
+          {cashParticipants
+            .filter((p) => !p.confirmed)
+            .map((p) => (
+              <Card key={`${p.game.id}-${p.userId}`} className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold">{p.user.displayName}</p>
+                    {p.user.username && (
+                      <p className="text-text-secondary text-xs">@{p.user.username}</p>
+                    )}
+                    <p className="text-text-secondary text-xs">
+                      {new Date(p.game.date).toLocaleDateString("ru-RU")} {p.game.time}
+                    </p>
+                  </div>
+                  <p className="text-gold text-xs font-semibold">CASH</p>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    min={0}
+                    value={cashAmounts[`${p.game.id}-${p.userId}`] ?? Math.round((p.game.price ?? 0) / 100)}
+                    onChange={(e) =>
+                      setCashAmounts((prev) => ({
+                        ...prev,
+                        [`${p.game.id}-${p.userId}`]: Number(e.target.value),
+                      }))
+                    }
+                    className="w-24 bg-bg border border-border rounded-lg px-2 py-1 text-center text-white text-sm"
+                    placeholder="Сумма ₽"
+                  />
+                  <span className="text-text-secondary text-xs">₽</span>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={async () => {
+                      const amount = cashAmounts[`${p.game.id}-${p.userId}`] ?? Math.round((p.game.price ?? 0) / 100);
+                      await api(`/games/${p.game.id}/confirm`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ userId: p.userId, action: "confirm", amount }),
+                      });
+                      setCashParticipants((prev) =>
+                        prev.map((x) =>
+                          x.userId === p.userId && x.game.id === p.game.id
+                            ? { ...x, confirmed: true }
+                            : x
+                        )
+                      );
+                    }}
+                  >
+                    Подтвердить
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-danger/20 text-danger"
+                    onClick={async () => {
+                      await api(`/games/${p.game.id}/confirm`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ userId: p.userId, action: "reject" }),
+                      });
+                      setCashParticipants((prev) =>
+                        prev.filter(
+                          (x) => !(x.userId === p.userId && x.game.id === p.game.id)
+                        )
+                      );
+                    }}
+                  >
+                    Отклонить
+                  </Button>
+                </div>
+              </Card>
+            ))}
+        </div>
+      )}
+
+      {/* Refunds tab */}
+      {tab === "refunds" && (
+        <div className="space-y-3">
+          <h2 className="font-semibold text-lg">Заявки на возврат</h2>
+          {refunds.length === 0 && (
+            <Card className="text-center text-text-secondary py-6">Нет заявок</Card>
+          )}
+          {refunds.map((r) => (
+            <Card key={r.id} className="space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-semibold">{r.user.displayName}</p>
+                  <p className="text-text-secondary text-xs">
+                    {new Date(r.game.date).toLocaleDateString("ru-RU")} {r.game.time}
+                  </p>
+                  {r.reason && <p className="text-sm mt-1">{r.reason}</p>}
+                </div>
+                <div className="text-right">
+                  <p className="text-gold font-bold">{(r.amount / 100).toLocaleString("ru-RU")} ₽</p>
+                  <p className={`text-xs font-semibold ${r.status === "DONE" ? "text-success" : r.status === "PROCESSING" ? "text-gold" : "text-text-secondary"}`}>
+                    {r.status === "CREATED" ? "Новая" : r.status === "PROCESSING" ? "В работе" : "Готово"}
+                  </p>
+                </div>
+              </div>
+              {r.status !== "DONE" && (
+                <div className="flex gap-2">
+                  {r.status === "CREATED" && (
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      onClick={async () => {
+                        await api(`/admin/refunds/${r.id}`, { method: "PATCH", body: JSON.stringify({ status: "PROCESSING" }) });
+                        setRefunds((prev) => prev.map((x) => x.id === r.id ? { ...x, status: "PROCESSING" } : x));
+                      }}
+                    >
+                      Взять в работу
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-success/20 text-success"
+                    onClick={async () => {
+                      await api(`/admin/refunds/${r.id}`, { method: "PATCH", body: JSON.stringify({ status: "DONE" }) });
+                      setRefunds((prev) => prev.map((x) => x.id === r.id ? { ...x, status: "DONE" } : x));
+                    }}
+                  >
+                    Готово
+                  </Button>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
       {/* Analytics tab */}
       {tab === "analytics" && analytics && (
-        <div className="space-y-4">
-          {/* Регистрации */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">РЕГИСТРАЦИИ В БОТЕ</p>
-            <div className="grid grid-cols-3 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Всего</p>
-                <p className="text-xl font-bold">{analytics.totalUsers as number}</p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">Месяц</p>
-                <p className="text-xl font-bold text-success">+{analytics.newUsersThisMonth as number}</p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">Неделя</p>
-                <p className="text-xl font-bold text-success">+{analytics.newUsersThisWeek as number}</p>
-              </Card>
-            </div>
-          </div>
-
-          {/* Игроки */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">КОЛИЧЕСТВО ИГРОКОВ</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Всего записей</p>
-                <p className="text-xl font-bold">{analytics.totalParticipants as number}</p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">Подтверждено</p>
-                <p className="text-xl font-bold text-success">{analytics.confirmedParticipants as number}</p>
-              </Card>
-            </div>
-          </div>
-
-          {/* Новые оплаченные */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">НОВЫЕ ОПЛАЧЕННЫЕ</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">За месяц</p>
-                <p className="text-xl font-bold text-success">{analytics.newPaidThisMonth as number}</p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">За неделю</p>
-                <p className="text-xl font-bold text-success">{analytics.newPaidThisWeek as number}</p>
-              </Card>
-            </div>
-          </div>
-
-          {/* Выручка общая */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">ВЫРУЧКА ИТОГО (онлайн + наличные)</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Всего</p>
-                <p className="text-xl font-bold text-gold">
-                  {((analytics.totalRevenueAll as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">За месяц</p>
-                <p className="text-xl font-bold text-gold">
-                  {((analytics.monthRevenueAll as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-            </div>
-          </div>
-
-          {/* Выручка онлайн */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">💳 ОНЛАЙН-ОПЛАТЫ (ЮКасса)</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Всего</p>
-                <p className="text-xl font-bold text-accent">
-                  {((analytics.totalRevenue as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">За месяц</p>
-                <p className="text-xl font-bold text-accent">
-                  {((analytics.monthRevenue as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-            </div>
-          </div>
-
-          {/* Выручка наличные */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">💵 ОПЛАТА НАЛИЧНЫМИ</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Всего</p>
-                <p className="text-xl font-bold text-success">
-                  {((analytics.cashRevenueTotal as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-                <p className="text-text-secondary text-xs mt-1">{analytics.cashParticipantsTotal as number} чел.</p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">За месяц</p>
-                <p className="text-xl font-bold text-success">
-                  {((analytics.cashRevenueMonth as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-                <p className="text-text-secondary text-xs mt-1">{analytics.cashParticipantsMonth as number} чел.</p>
-              </Card>
-            </div>
-          </div>
-
-          {/* Выручка кальянки */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">ВЫРУЧКА КАЛЬЯНКИ</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Всего</p>
-                <p className="text-xl font-bold text-gold">
-                  {((analytics.hookahRevenueTotal as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">За месяц</p>
-                <p className="text-xl font-bold text-gold">
-                  {((analytics.hookahRevenueMonth as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-            </div>
-          </div>
-
-          {/* Средний чек кальянки */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">СРЕДНИЙ ЧЕК КАЛЬЯНКИ</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Всего</p>
-                <p className="text-xl font-bold text-accent">
-                  {((analytics.hookahAvgTotal as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">За месяц</p>
-                <p className="text-xl font-bold text-accent">
-                  {((analytics.hookahAvgMonth as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-            </div>
-          </div>
-
-          {/* Реферальная программа */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">СУММА В РЕФЕРАЛЬНУЮ</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Всего</p>
-                <p className="text-xl font-bold text-gold">
-                  {((analytics.referralTotal as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">За месяц</p>
-                <p className="text-xl font-bold text-gold">
-                  {((analytics.referralMonth as number) / 100).toLocaleString("ru-RU")} ₽
-                </p>
-              </Card>
-            </div>
-            {(analytics.pendingWithdrawals as number) > 0 && (
-              <Card className="mt-3 border-gold/30">
-                <p className="text-text-secondary text-xs">Заявки на вывод</p>
-                <p className="text-xl font-bold text-gold">{analytics.pendingWithdrawals as number}</p>
-              </Card>
-            )}
-          </div>
-
-          {/* Игры */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">ИГРЫ</p>
-            <div className="grid grid-cols-3 gap-3">
-              <Card>
-                <p className="text-text-secondary text-xs">Всего</p>
-                <p className="text-xl font-bold">{analytics.totalGames as number}</p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">Активных</p>
-                <p className="text-xl font-bold text-success">{analytics.activeGames as number}</p>
-              </Card>
-              <Card>
-                <p className="text-text-secondary text-xs">Завершено</p>
-                <p className="text-xl font-bold">{analytics.finishedGames as number}</p>
-              </Card>
-            </div>
-          </div>
-
-          {/* Статистика */}
-          <div>
-            <p className="text-text-secondary text-xs font-semibold mb-2">СТАТИСТИКА</p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             <Card>
-              <p className="text-text-secondary text-xs">Средний балл за игру</p>
-              <p className="text-2xl font-bold text-accent">{analytics.avgPoints as number}</p>
+              <p className="text-text-secondary text-xs">Пользователи</p>
+              <p className="text-2xl font-bold">{analytics.totalUsers as number}</p>
+            </Card>
+            <Card>
+              <p className="text-text-secondary text-xs">Всего игр</p>
+              <p className="text-2xl font-bold">{analytics.totalGames as number}</p>
+            </Card>
+            <Card>
+              <p className="text-text-secondary text-xs">Активных игр</p>
+              <p className="text-2xl font-bold text-success">
+                {analytics.activeGames as number}
+              </p>
+            </Card>
+            <Card>
+              <p className="text-text-secondary text-xs">Оплаченные</p>
+              <p className="text-2xl font-bold">{analytics.paidCount as number}</p>
+              <p className="text-text-secondary text-xs mt-1">
+                Новые: {analytics.firstPaidCount as number}
+              </p>
             </Card>
           </div>
-
-          {/* Топ игроков */}
-          {(analytics.topPlayers as { displayName: string; totalPoints: number; level: string }[])?.length > 0 && (
-            <div>
-              <p className="text-text-secondary text-xs font-semibold mb-2">ТОП-5 ИГРОКОВ</p>
-              <Card className="space-y-2">
-                {(analytics.topPlayers as { displayName: string; totalPoints: number; level: string }[]).map(
-                  (p, i) => (
-                    <div key={i} className="flex items-center justify-between py-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-text-secondary text-xs w-4">{i + 1}</span>
-                        <span className="text-sm font-semibold">{p.displayName}</span>
-                      </div>
-                      <span className="text-gold text-sm font-bold">{p.totalPoints}</span>
-                    </div>
-                  )
-                )}
-              </Card>
-            </div>
-          )}
-
-          {/* Ближайшие игры */}
-          {(analytics.upcomingGames as { id: string; date: string; time: string; type: string; status: string; playersCount: number; playersLimit: number }[])?.length > 0 && (
-            <div>
-              <p className="text-text-secondary text-xs font-semibold mb-2">БЛИЖАЙШИЕ ИГРЫ</p>
-              <div className="space-y-2">
-                {(analytics.upcomingGames as { id: string; date: string; time: string; type: string; status: string; playersCount: number; playersLimit: number }[]).map(
-                  (g) => (
-                    <Card key={g.id} className="flex items-center justify-between py-3">
-                      <div>
-                        <p className="text-sm font-semibold">
-                          {new Date(g.date).toLocaleDateString("ru-RU", {
-                            day: "numeric",
-                            month: "short",
-                          })}{" "}
-                          в {g.time}
-                        </p>
-                        <p className="text-text-secondary text-xs">{TYPE_LABELS[g.type] || g.type}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold">
-                          {g.playersCount}/{g.playersLimit}
-                        </p>
-                        <p className={`text-xs font-semibold ${g.status === "FULL" ? "text-danger" : "text-success"}`}>
-                          {g.status === "FULL" ? "Заполнена" : "Открыта"}
-                        </p>
-                      </div>
-                    </Card>
-                  )
-                )}
+          {/* Выручка */}
+          <Card>
+            <p className="text-text-secondary text-xs mb-2">Выручка</p>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-sm text-text-secondary">ЮКасса</span>
+                <span className="text-sm font-semibold">
+                  {((analytics.yukassaRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-text-secondary">Наличные</span>
+                <span className="text-sm font-semibold">
+                  {((analytics.cashRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-border pt-1 mt-1">
+                <span className="text-sm font-semibold">Итого</span>
+                <span className="text-lg font-bold text-gold">
+                  {((analytics.totalRevenue as number) / 100).toLocaleString("ru-RU")} ₽
+                </span>
               </div>
             </div>
-          )}
+          </Card>
         </div>
       )}
     </div>

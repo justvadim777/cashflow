@@ -4,6 +4,12 @@ import { webhookCallback } from "grammy";
 
 // Telegram Bot Webhook handler
 export async function POST(req: NextRequest) {
+  // В production TELEGRAM_BOT_SECRET обязателен
+  if (process.env.NODE_ENV === "production" && !process.env.TELEGRAM_BOT_SECRET) {
+    console.error("TELEGRAM_BOT_SECRET is required in production");
+    return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
+  }
+
   // Проверка секретного токена
   const secret = req.headers.get("x-telegram-bot-api-secret-token");
   if (process.env.TELEGRAM_BOT_SECRET && secret !== process.env.TELEGRAM_BOT_SECRET) {

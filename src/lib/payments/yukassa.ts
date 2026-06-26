@@ -49,6 +49,46 @@ export async function createPayment(params: CreatePaymentParams): Promise<YuKass
   return response.json();
 }
 
+export async function cancelPayment(providerPaymentId: string): Promise<void> {
+  const response = await fetch(`https://api.yookassa.ru/v3/payments/${providerPaymentId}/cancel`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotence-Key": crypto.randomUUID(),
+      Authorization: `Basic ${Buffer.from(`${SHOP_ID}:${SECRET_KEY}`).toString("base64")}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`YuKassa cancel error: ${response.status} ${error}`);
+  }
+}
+
+export async function refundPayment(providerPaymentId: string, amount: number): Promise<void> {
+  const idempotencyKey = crypto.randomUUID();
+  const amountValue = (amount / 100).toFixed(2);
+
+  const response = await fetch("https://api.yookassa.ru/v3/refunds", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotence-Key": idempotencyKey,
+      Authorization: `Basic ${Buffer.from(`${SHOP_ID}:${SECRET_KEY}`).toString("base64")}`,
+    },
+    body: JSON.stringify({
+      payment_id: providerPaymentId,
+      amount: { value: amountValue, currency: "RUB" },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`YuKassa refund error: ${response.status} ${error}`);
+  }
+}
+
 export function verifyWebhookSignature(body: string, signature: string): boolean {
   // ЮКасса использует IP whitelist для webhook-ов
   // Дополнительная проверка через secret если настроено
@@ -59,5 +99,7 @@ export function verifyWebhookSignature(body: string, signature: string): boolean
     .update(body)
     .digest("hex");
 
+  // timingSafeEqual requires same-length buffers
+  if (expected.length !== signature.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }

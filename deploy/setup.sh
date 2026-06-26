@@ -103,25 +103,8 @@ EnvironmentFile=$APP_DIR/.env.production
 WantedBy=multi-user.target
 SERVICE
 
-# 10. Systemd сервис для Telegram бота
-echo ">>> Создание systemd-сервиса (bot)..."
-cat > /etc/systemd/system/cashflow-bot.service <<SERVICE
-[Unit]
-Description=Cashflow Telegram Bot
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=$APP_DIR
-ExecStart=/usr/bin/npx tsx scripts/bot-polling.ts
-Restart=on-failure
-RestartSec=5
-EnvironmentFile=$APP_DIR/.env.production
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
+# 10. Примечание: бот работает через webhook, polling только локально
+echo ">>> Бот настраивается через webhook после деплоя (polling — только для локальной разработки)"
 
 systemctl daemon-reload
 
@@ -138,6 +121,27 @@ NEXT_PUBLIC_TG_APP_URL="https://$DOMAIN"
 ENV
 
 chmod 600 $APP_DIR/.env.production
+
+# 12. Crontab
+echo ">>> Настройка crontab..."
+NEXTAUTH_SECRET_VAL=$(grep NEXTAUTH_SECRET $APP_DIR/.env.production | cut -d'"' -f2)
+(crontab -l 2>/dev/null; cat <<CRON
+# Cashflow cron jobs
+*/15 * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/notify-upcoming >> /var/log/cashflow-cron.log 2>&1
+0 12 * * *  curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/notify-inactive >> /var/log/cashflow-cron.log 2>&1
+*/5  * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/cleanup-pending >> /var/log/cashflow-cron.log 2>&1
+*/15 * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/finish-games >> /var/log/cashflow-cron.log 2>&1
+*/5  * * * * curl -fsS -H "Authorization: Bearer $NEXTAUTH_SECRET_VAL" https://$DOMAIN/api/cron/expire-waitlist >> /var/log/cashflow-cron.log 2>&1
+0 3 * * *   sudo -u postgres pg_dump cashflow | gzip > /backups/cashflow_$(date +\%Y\%m\%d).sql.gz
+0 4 * * 0   find /backups -name "cashflow_*.sql.gz" -mtime +30 -delete
+CRON
+) | crontab -
+
+# 13. Директория для бэкапов
+echo ">>> Создание директории бэкапов..."
+mkdir -p /backups
+chmod 700 /backups
+chown postgres:postgres /backups
 
 echo ""
 echo "========================================="

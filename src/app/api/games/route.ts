@@ -7,44 +7,47 @@ import type { GameType } from "@/generated/prisma/client";
 // GET /api/games — список игр
 export async function GET(req: NextRequest) {
   return withAuth(req, async (_req, { user }) => {
-    // Автозавершение игр через 3 часа
     await autoFinishGames();
     const url = new URL(_req.url);
     const type = url.searchParams.get("type") as GameType | null;
     const status = url.searchParams.get("status");
 
-    const games = await prisma.game.findMany({
-      where: {
-        ...(type ? { type } : {}),
-        ...(status === "active" ? { status: { in: ["OPEN", "FULL"] } } : {}),
-        ...(status === "finished" ? { status: "FINISHED" } : {}),
-      },
-      include: {
-        participants: {
-          select: {
-            id: true,
-            confirmed: true,
-            userId: true,
-            user: {
-              select: { id: true, displayName: true, avatarUrl: true, username: true },
+    const [games, topMonthly] = await Promise.all([
+      prisma.game.findMany({
+        where: {
+          ...(type ? { type } : {}),
+          ...(status === "active" ? { status: { in: ["OPEN", "FULL"] } } : {}),
+          ...(status === "finished" ? { status: "FINISHED" } : {}),
+        },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: { id: true, displayName: true, avatarUrl: true, username: true },
+              },
             },
           },
         },
-        _count: { select: { participants: true } },
-      },
-      orderBy: { date: "asc" },
-    });
+        orderBy: { date: "asc" },
+      }),
+      // Топ-5 по monthly_points для флага «топовые игроки»
+      prisma.user.findMany({
+        where: { monthlyPoints: { gt: 0 } },
+        orderBy: { monthlyPoints: "desc" },
+        take: 5,
+        select: { id: true },
+      }),
+    ]);
 
-    // Топ-5 игроков за месяц
-    const top5 = await prisma.user.findMany({
-      orderBy: { monthlyPoints: "desc" },
-      where: { monthlyPoints: { gt: 0 } },
-      take: 5,
-      select: { id: true },
-    });
-    const topPlayerIds = top5.map((p) => p.id);
+    const topIds = new Set(topMonthly.map((u) => u.id));
+    const topPlayerIds = topMonthly.map((u) => u.id);
 
-    return NextResponse.json({ games, userId: user.id, topPlayerIds });
+    const serialized = games.map((game) => ({
+      ...game,
+      hasTopPlayer: game.participants.some((p) => topIds.has(p.userId)),
+    }));
+
+    return NextResponse.json({ games: serialized, userId: user.id, topPlayerIds });
   });
 }
 
