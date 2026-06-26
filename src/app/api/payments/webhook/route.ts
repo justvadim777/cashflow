@@ -5,7 +5,6 @@ import { isYukassaIp } from "@/lib/payments/yukassa-ips";
 import { verifyWebhookSignature, refundPayment } from "@/lib/payments/yukassa";
 import { tryIncrementPlayers } from "@/lib/games/atomic-join";
 import { checkGameAchievements, checkReferralAchievement } from "@/lib/achievements/check";
-import { sendNotification } from "@/lib/notifications/bot";
 
 // POST /api/payments/webhook — ЮКасса webhook
 export async function POST(req: NextRequest) {
