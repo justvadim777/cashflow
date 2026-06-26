@@ -21,14 +21,9 @@ npx prisma generate
 echo ">>> Prisma migrate..."
 npx prisma migrate deploy
 
-# 4. Сборка
+# 4. Сборка (без doppler, env берём из .env.production)
 echo ">>> Next.js build..."
-npm run build
-
-# 4.1 Копирование static файлов в standalone
-echo ">>> Копирование static..."
-cp -r .next/static .next/standalone/.next/static
-cp -r public .next/standalone/public
+set -a; source $APP_DIR/.env.production; set +a; npm run build:ci
 
 # 5. Перезапуск сервисов
 echo ">>> Перезапуск сервисов..."
