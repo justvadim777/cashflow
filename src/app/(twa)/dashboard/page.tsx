@@ -55,29 +55,21 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      {/* Баннер подписки на ТГК */}
-      {!dismissedSubscribeBanner && (
-        <div className="relative flex items-center gap-3 bg-accent/10 border border-accent/30 rounded-xl px-4 py-3">
-          <span className="text-lg">📢</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">Подпишись на наш Telegram-канал</p>
-            <p className="text-text-secondary text-xs">Будь в потоке последних новостей</p>
-          </div>
-          <button
-            onClick={() => openTgLink(TG_CHANNEL)}
-            className="shrink-0 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold"
-          >
-            Подписаться
-          </button>
-          <button
-            onClick={dismissSubscribeBanner}
-            className="shrink-0 text-text-secondary hover:text-white text-lg leading-none ml-1"
-            aria-label="Закрыть"
-          >
-            ×
-          </button>
-        </div>
-      )}
+      {/* Каналы */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => openTgLink(TG_CHANNEL)}
+          className="flex-1 flex items-center justify-center gap-1.5 bg-card border border-border rounded-xl py-2.5 text-xs font-semibold text-accent hover:border-accent/40 transition-colors"
+        >
+          📢 Подписаться на канал
+        </button>
+        <button
+          onClick={() => openTgLink(TG_LOUNGE)}
+          className="flex-1 flex items-center justify-center gap-1.5 bg-card border border-border rounded-xl py-2.5 text-xs font-semibold text-accent hover:border-accent/40 transition-colors"
+        >
+          🏝 Остров Lounge
+        </button>
+      </div>
 
       {/* Приветствие */}
       <div>
@@ -193,26 +185,6 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* Каналы снизу */}
-      <div className="flex gap-2">
-        <a
-          href="https://t.me/CashFlow_VTR"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 flex items-center justify-center gap-1.5 bg-card border border-border rounded-xl py-2.5 text-xs font-semibold text-accent hover:border-accent/40 transition-colors"
-        >
-          📢 Подписаться на канал
-        </a>
-        <a
-          href="https://t.me/ostrovnezh"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 flex items-center justify-center gap-1.5 bg-card border border-border rounded-xl py-2.5 text-xs font-semibold text-accent hover:border-accent/40 transition-colors"
-        >
-          🏝 Остров Lounge
-        </a>
-      </div>
-
       {/* Реферальный код */}
       {referralCode && (
         <Card>
@@ -235,23 +207,6 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Кнопки каналов (задача 6) */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={() => openTgLink(TG_CHANNEL)}
-          className="flex items-center justify-center gap-2 bg-card border border-border rounded-xl px-3 py-3 hover:border-accent/30 transition-colors"
-        >
-          <span className="text-accent text-lg">✈</span>
-          <span className="text-sm font-semibold">Канал Cashflow</span>
-        </button>
-        <button
-          onClick={() => openTgLink(TG_LOUNGE)}
-          className="flex items-center justify-center gap-2 bg-card border border-border rounded-xl px-3 py-3 hover:border-accent/30 transition-colors"
-        >
-          <span className="text-accent text-lg">✈</span>
-          <span className="text-sm font-semibold">Канал Острова</span>
-        </button>
-      </div>
     </div>
   );
 }
