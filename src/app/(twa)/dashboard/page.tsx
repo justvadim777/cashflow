@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useUserStore } from "@/store/user";
-import { useUiStore } from "@/store/ui";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
@@ -44,7 +43,6 @@ function openTgLink(url: string) {
 
 export default function DashboardPage() {
   const { displayName, totalPoints, level, referralCode } = useUserStore();
-  const { dismissedSubscribeBanner, dismissSubscribeBanner } = useUiStore();
   const [nextGame, setNextGame] = useState<NextGame | null | undefined>(undefined);
 
   useEffect(() => {
